@@ -8,7 +8,7 @@ NewAPI 接管客户声明的服务端联网工具，原模型生成搜索词，C
 
 覆盖入口：Responses 的 web_search / web_search_preview、Claude 的 web_search / web_fetch、Chat 的 web_search_options / enable_search、Gemini Google Search / URL Context，以及 Codex `/v1/alpha/search` 的 search_query / open / find / click。Alpha Search 只调用搜索服务，不额外生成模型回答。
 
-不能由 DeepSeek Search/Fetch 提供的专用命令（例如图片搜索、PDF 截图、金融和天气工具）、缓存模式或无法保留的供应商扩展会明确报错，不回退到另一家收费搜索引擎。搜索专用模型需改用普通模型加 web_search；模型供应商或渠道参数不得在转换后重新开启原厂 hosted 搜索。
+不能由 DeepSeek Search/Fetch 提供的专用命令（例如图片搜索、PDF 截图、金融和天气工具）或无法保留的供应商扩展会明确报错，不回退到另一家收费搜索引擎。Codex 等客户端默认的缓存搜索（`web_search` 的 `external_web_access=false`，以及 `web_search_preview`、`web_search_options` 和 Alpha Search settings 上的同类布尔标记）没有独立索引，改为走同一条 DeepSeek 实时搜索，并按一次普通联网搜索计费。搜索专用模型需改用普通模型加 web_search；模型供应商或渠道参数不得在转换后重新开启原厂 hosted 搜索。
 
 ## 计费和交付
 

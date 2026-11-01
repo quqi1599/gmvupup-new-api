@@ -105,13 +105,59 @@ func TestManagedPlanPreservesModelControlsAndNumbers(t *testing.T) {
 	require.NotContains(t, string(encoded), `"type":"web_search"`)
 }
 func TestManagedPlanRejectsLostSemanticsAndDoesNotStealClientFunction(t *testing.T) {
-	for _, tool := range []string{`{"type":"web_search","external_web_access":false}`, `{"type":"web_search","user_location":{"city":"Paris"}}`, `{"type":"web_search","max_uses":0}`, `{"type":"web_search","max_uses":1.5}`, `{"type":"web_search","filters":{"allowed_domains":["x.com OR evil"]}}`} {
+	for _, tool := range []string{`{"type":"web_search","external_web_access":"false"}`, `{"type":"web_search","external_web_access":0}`, `{"type":"web_search","user_location":{"city":"Paris"}}`, `{"type":"web_search","max_uses":0}`, `{"type":"web_search","max_uses":1.5}`, `{"type":"web_search","filters":{"allowed_domains":["x.com OR evil"]}}`} {
 		_, err := NewPlan([]byte(`{"tools":[`+tool+`]}`), "responses")
 		require.Error(t, err)
 	}
 	p, err := NewPlan([]byte(`{"tools":[{"type":"function","name":"web_search"}]}`), "responses")
 	require.NoError(t, err)
 	require.Nil(t, p)
+}
+
+func TestCacheOnlyWebSearchUsesLiveDeepSeekAndSameMeter(t *testing.T) {
+	execute := func(t *testing.T, protocol, body string) (wire string, searches, meter int) {
+		t.Helper()
+		p, err := NewPlan([]byte(body), protocol)
+		require.NoError(t, err)
+		require.NotNil(t, p)
+		require.True(t, p.Search)
+		require.NoError(t, p.Tools())
+		backend := &fakeBackend{}
+		session := &Session{Backend: backend, Store: memoryStore{}}
+		executed, err := p.Execute(context.Background(), session, Call{ID: "call1", Name: SearchFunction, Arguments: []byte(`{"query":"test"}`), Original: Raw(map[string]string{"id": "call1"})})
+		require.NoError(t, err)
+		require.False(t, executed.Failed)
+		require.Equal(t, "deepseek", gjson.GetBytes(executed.Data, "provider").String())
+		require.NotContains(t, string(Raw(p.Body)), "external_web_access")
+		return string(Raw(p.Body)), backend.searches, session.Meter.Search
+	}
+	liveWire, liveSearches, liveMeter := execute(t, "responses", `{"model":"gpt-6.1-sol","input":"query","tools":[{"type":"web_search","external_web_access":true}]}`)
+	cachedWire, cachedSearches, cachedMeter := execute(t, "responses", `{"model":"gpt-6.1-sol","input":"query","tools":[{"type":"web_search","external_web_access":false}]}`)
+	require.JSONEq(t, liveWire, cachedWire)
+	require.NotContains(t, cachedWire, `"type":"web_search"`)
+	require.Contains(t, cachedWire, SearchFunction)
+	require.Equal(t, 1, liveSearches)
+	require.Equal(t, liveSearches, cachedSearches)
+	require.Equal(t, 1, liveMeter)
+	require.Equal(t, liveMeter, cachedMeter)
+
+	previewWire, previewSearches, previewMeter := execute(t, "responses", `{"model":"gpt-6.1-sol","input":"query","tools":[{"type":"web_search_preview","external_web_access":false}]}`)
+	require.JSONEq(t, liveWire, previewWire)
+	require.Equal(t, liveSearches, previewSearches)
+	require.Equal(t, liveMeter, previewMeter)
+
+	_, chatSearches, chatMeter := execute(t, "chat", `{"model":"gpt-6.1-sol","messages":[{"role":"user","content":"query"}],"web_search_options":{"external_web_access":false}}`)
+	require.Equal(t, liveSearches, chatSearches)
+	require.Equal(t, liveMeter, chatMeter)
+
+	for _, settings := range []string{`"external_web_access":true`, `"external_web_access":false`} {
+		backend := &fakeBackend{}
+		session := &Session{Backend: backend, Store: memoryStore{}}
+		_, err := Alpha(context.Background(), session, []byte(`{"settings":{`+settings+`},"commands":{"search_query":[{"q":"one"}]}}`))
+		require.NoError(t, err)
+		require.Equal(t, 1, backend.searches)
+		require.Equal(t, liveMeter, session.Meter.Search)
+	}
 }
 func TestManagedSearchHistoryRoundTrip(t *testing.T) {
 	for _, protocol := range []string{"responses", "claude"} {
