@@ -88,6 +88,9 @@
     "typescript": "4.4.2",
     "vite": "^5.2.0"
   },
+  "overrides": {
+    "dompurify": "3.4.17"
+  },
   "prettier": {
     "singleQuote": true,
     "jsxSingleQuote": true

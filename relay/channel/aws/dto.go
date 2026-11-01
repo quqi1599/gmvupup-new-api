@@ -25,6 +25,7 @@ type AwsClaudeRequest struct {
 	StopSequences     []string            `json:"stop_sequences,omitempty"`
 	Tools             any                 `json:"tools,omitempty"`
 	ToolChoice        any                 `json:"tool_choice,omitempty"`
+	Safeguards        json.RawMessage     `json:"safeguards,omitempty"`
 	ContextManagement json.RawMessage     `json:"context_management,omitempty"`
 	Thinking          *dto.Thinking       `json:"thinking,omitempty"`
 	OutputConfig      json.RawMessage     `json:"output_config,omitempty"`
@@ -45,7 +46,7 @@ func formatRequest(requestBody io.Reader, requestHeader http.Header) (*AwsClaude
 		var tempArray []string
 		tempArray = strings.Split(anthropicBetaValues, ",")
 		if len(tempArray) > 0 {
-			betaJson, err := json.Marshal(tempArray)
+			betaJson, err := common.Marshal(tempArray)
 			if err != nil {
 				return nil, err
 			}

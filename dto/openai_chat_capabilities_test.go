@@ -15,6 +15,15 @@ func TestOpenAIChatCapabilitiesCompatibility(t *testing.T) {
 		{"gpt-6-luna", "none", true, true, true, true, true},
 		{"gpt-6-sol", "high", true, true, false, false, false},
 		{"gpt-6-astra", "none", true, true, false, false, false},
+		{"gpt-6.1-sol", "", true, true, false, false, false},
+		{"gpt-6.1-sol", "none", true, true, false, false, false},
+		{"gpt-6.1-sol-2026-10-28", "high", true, true, false, false, false},
+		{"gpt-6.1-terra", "", true, true, false, false, false},
+		{"gpt-6.1-terra", "none", true, true, true, true, true},
+		{"gpt-6.1-terra", "high", true, true, false, false, false},
+		{"gpt-6.1-terra-2026-10-28", "none", true, true, true, true, true},
+		{"gpt-6.1-terra-2026-99-99", "none", false, false, true, true, true},
+		{"gpt-6.1-sol-custom", "high", false, false, true, true, true},
 		{"gpt-6-luna-2026-09-03", "none", true, true, true, true, true},
 		{"gpt-6-sol-2026-99-99", "none", false, false, true, true, true},
 		{"gpt-6-sol-custom", "high", false, false, true, true, true},
@@ -34,7 +43,7 @@ func TestOpenAIChatCapabilitiesCompatibility(t *testing.T) {
 			require.Equal(t, OpenAIChatCapabilities{UseMaxCompletionTokens: tt.completion, UseDeveloperRole: tt.developer, SupportsTemperature: tt.temperature, SupportsTopP: tt.topP, SupportsLogProbs: tt.logprobs}, got)
 		})
 	}
-	for _, name := range []string{"gpt-6-sol-high", "gpt-6-luna-none", "gpt-6-astra-2026-09-03-high"} {
+	for _, name := range []string{"gpt-6-sol-high", "gpt-6-luna-none", "gpt-6-astra-2026-09-03-high", "gpt-6.1-sol-high", "gpt-6.1-terra-2026-10-28-none"} {
 		require.Equal(t, "developer", (&GeneralOpenAIRequest{Model: name}).GetSystemRoleName())
 	}
 }

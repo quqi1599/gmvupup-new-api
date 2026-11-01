@@ -118,6 +118,14 @@ func TestGPT6ChatCompatibility(t *testing.T) {
 		{"gpt-6-luna-2026-09-03", "", "gpt-6-luna-2026-09-03", true},
 		{"gpt-6-astra", "none", "gpt-6-astra", false},
 		{"gpt-6-astra-2026-09-03-high", "", "gpt-6-astra-2026-09-03", false},
+		{"gpt-6.1-sol", "", "gpt-6.1-sol", false},
+		{"gpt-6.1-sol", "none", "gpt-6.1-sol", false},
+		{"gpt-6.1-sol-2026-10-28-high", "", "gpt-6.1-sol-2026-10-28", false},
+		{"gpt-6.1-terra", "", "gpt-6.1-terra", false},
+		{"gpt-6.1-terra", "none", "gpt-6.1-terra", true},
+		{"gpt-6.1-terra-high", "none", "gpt-6.1-terra", false},
+		{"gpt-6.1-terra-none", "high", "gpt-6.1-terra", true},
+		{"gpt-6.1-terra-2026-10-28", "none", "gpt-6.1-terra-2026-10-28", true},
 	} {
 		t.Run(tt.model+"/"+tt.effort, func(t *testing.T) {
 			for _, channelType := range []int{constant.ChannelTypeOpenAI, constant.ChannelTypeAzure} {
@@ -169,7 +177,7 @@ func TestChatLimitPresenceCompatibility(t *testing.T) {
 }
 
 func TestChatUnknownMappedModelCompatibility(t *testing.T) {
-	for _, modelName := range []string{"qwen3.8-max", "ollama-model", "gpt-6-sol-custom", "gpt-6-sol-invalid-high"} {
+	for _, modelName := range []string{"qwen3.8-max", "ollama-model", "gpt-6-sol-custom", "gpt-6-sol-invalid-high", "gpt-6.1-sol-custom", "gpt-6.1-terra-2026-99-99"} {
 		c, _ := setupOpenAITestContext()
 		info := &relaycommon.RelayInfo{OriginModelName: "gpt-6-sol", ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI, UpstreamModelName: modelName}}
 		req := &dto.GeneralOpenAIRequest{Model: modelName, MaxTokens: common.GetPointer(uint(8)), Temperature: common.GetPointer(0.0), TopP: common.GetPointer(0.0), Messages: []dto.Message{{Role: "system", Content: "instruction"}}}

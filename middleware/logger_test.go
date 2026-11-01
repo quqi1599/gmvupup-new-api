@@ -2,13 +2,100 @@ package middleware
 
 import (
 	"bytes"
+	"fmt"
+	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAccessAndPanicLogsFollowLogRotation(t *testing.T) {
+	previousMode, previousWriter, previousErrorWriter := gin.Mode(), gin.DefaultWriter, gin.DefaultErrorWriter
+	previousLogDir := *common.LogDir
+	gin.SetMode(gin.TestMode)
+	*common.LogDir = t.TempDir()
+	t.Cleanup(func() {
+		gin.SetMode(previousMode)
+		common.LogWriterMu.Lock()
+		gin.DefaultWriter, gin.DefaultErrorWriter = previousWriter, previousErrorWriter
+		common.LogWriterMu.Unlock()
+		*common.LogDir = previousLogDir
+	})
+
+	logger.SetupLogger()
+	router := gin.New()
+	router.Use(PanicRecover())
+	SetUpLogger(router)
+	router.GET("/ok/:step", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	router.GET("/panic", func(c *gin.Context) { panic("rotation-panic-marker") })
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ok/before-rotation", nil))
+	content, err := os.ReadFile(logger.GetCurrentLogPath())
+	require.NoError(t, err)
+	require.Contains(t, string(content), "/ok/before-rotation")
+
+	// A different directory forces a new file even within the same second.
+	*common.LogDir = t.TempDir()
+	logger.SetupLogger()
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ok/after-rotation?api_key=ROTATION_SECRET&alt=sse", nil))
+	panicResponse := httptest.NewRecorder()
+	router.ServeHTTP(panicResponse, httptest.NewRequest(http.MethodGet, "/panic", nil))
+	require.Equal(t, http.StatusInternalServerError, panicResponse.Code)
+	require.Contains(t, panicResponse.Body.String(), `"type":"new_api_panic"`)
+
+	content, err = os.ReadFile(logger.GetCurrentLogPath())
+	require.NoError(t, err)
+	require.Contains(t, string(content), "/ok/after-rotation")
+	require.Contains(t, string(content), "alt=sse")
+	require.NotContains(t, string(content), "ROTATION_SECRET")
+	require.NotContains(t, string(content), "/ok/before-rotation")
+	require.Contains(t, string(content), "[Recovery]")
+	require.Contains(t, string(content), "rotation-panic-marker\n")
+	require.Contains(t, string(content), "middleware/logger_test.go")
+
+	// Exercise the swap/close boundary while requests are writing. Every marker
+	// must survive exactly once across the files created by concurrent rotations.
+	var requests sync.WaitGroup
+	start := make(chan struct{})
+	for worker := 0; worker < 4; worker++ {
+		requests.Add(1)
+		go func() {
+			defer requests.Done()
+			<-start
+			for request := 0; request < 20; request++ {
+				target := fmt.Sprintf("/ok/concurrent-%d-%d", worker, request)
+				router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, target, nil))
+			}
+		}()
+	}
+	close(start)
+	for rotation := 0; rotation < 10; rotation++ {
+		logger.SetupLogger()
+	}
+	requests.Wait()
+	paths, err := filepath.Glob(filepath.Join(*common.LogDir, "*.log"))
+	require.NoError(t, err)
+	var allLogs strings.Builder
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		allLogs.Write(data)
+	}
+	for worker := 0; worker < 4; worker++ {
+		for request := 0; request < 20; request++ {
+			marker := fmt.Sprintf("/ok/concurrent-%d-%d\n", worker, request)
+			require.Equal(t, 1, strings.Count(allLogs.String(), marker), marker)
+		}
+	}
+}
 
 func TestBatch1AccessLogCredentials(t *testing.T) {
 	writer := gin.DefaultWriter
