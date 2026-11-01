@@ -85,6 +85,9 @@ func isExhaustedGatewayError(err *types.NewAPIError) bool {
 	if err.HasGatewayRetryScope() {
 		return true
 	}
+	if types.IsUpstreamClientRejected(err) {
+		return true
+	}
 	switch err.GetErrorCode() {
 	case "auth_unavailable", "auth_not_found", "codex_channels_unavailable":
 		return err.StatusCode == http.StatusServiceUnavailable

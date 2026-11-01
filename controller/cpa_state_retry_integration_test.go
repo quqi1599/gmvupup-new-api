@@ -39,6 +39,7 @@ type cpaStateAliasOptions struct {
 	requestBody                       string
 	requestHeaders                    http.Header
 	staleReplayBarrier                string
+	noAlias                           bool
 }
 
 // Exercise Relay, real HTTP decoding and the selector across three rounds.
@@ -162,7 +163,7 @@ func runCPAStateRelay(t *testing.T, code string, status int, alternate, stream b
 			first = channel
 		}
 	}
-	if len(sameServiceAlias) > 0 {
+	if len(sameServiceAlias) > 0 && !sameServiceAlias[0].noAlias {
 		alias := first
 		alias.Id = 19
 		if sameServiceAlias[0].claude {

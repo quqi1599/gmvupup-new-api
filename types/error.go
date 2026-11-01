@@ -95,6 +95,7 @@ const (
 	ErrorCodeGPTSamplingUnsupported        ErrorCode = "gpt_sampling_unsupported"
 	ErrorCodeCompactionRouteUnavailable    ErrorCode = "compaction_route_unavailable"
 	ErrorCodeCPAContentAuditBlocked        ErrorCode = "cpa_content_audit_blocked"
+	ErrorCodeUpstreamClientRejected        ErrorCode = "upstream_client_rejected"
 
 	// sql error
 	ErrorCodeQueryDataError  ErrorCode = "query_data_error"
@@ -106,19 +107,20 @@ const (
 )
 
 type NewAPIError struct {
-	Err                  error
-	RelayError           any
-	skipRetry            bool
-	allowChannelPenalty  bool
-	upstreamResponded    bool
-	retryAfter           string
-	gatewayRetryAttempts int
-	gatewayPoolExhausted bool
-	recordErrorLog       *bool
-	errorType            ErrorType
-	errorCode            ErrorCode
-	StatusCode           int
-	Metadata             json.RawMessage
+	Err                    error
+	RelayError             any
+	skipRetry              bool
+	allowChannelPenalty    bool
+	upstreamResponded      bool
+	upstreamClientRejected bool
+	retryAfter             string
+	gatewayRetryAttempts   int
+	gatewayPoolExhausted   bool
+	recordErrorLog         *bool
+	errorType              ErrorType
+	errorCode              ErrorCode
+	StatusCode             int
+	Metadata               json.RawMessage
 }
 
 // Unwrap enables errors.Is / errors.As to work with NewAPIError by exposing the underlying error.
@@ -412,6 +414,9 @@ func IsSkipRetryError(err *NewAPIError) bool {
 // counted by channel health policy.
 func IsChannelPenaltyAllowed(err *NewAPIError) bool {
 	if err == nil {
+		return false
+	}
+	if IsUpstreamClientRejected(err) {
 		return false
 	}
 	return !err.skipRetry || err.allowChannelPenalty

@@ -85,6 +85,8 @@ func ClaudeErrorWrapperLocal(err error, code string, statusCode int) *dto.Claude
 
 func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFail bool) (newApiErr *types.NewAPIError) {
 	retryAfter := ""
+	upstreamMessage := ""
+	var upstreamErrorBody []byte
 	if resp != nil {
 		retryAfter = resp.Header.Get("Retry-After")
 	}
@@ -135,6 +137,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		if newApiErr != nil && (localAuditBlocked || newApiErr.GetErrorCode() == types.ErrorCodeCPAContentAuditBlocked) {
 			newApiErr = types.NewError(newApiErr, newApiErr.GetErrorCode(), types.ErrOptionWithSkipRetry())
 		}
+		markUpstreamClientRejection(newApiErr, upstreamMessage, upstreamErrorBody)
 	}()
 	defer CloseResponseBodyGracefully(resp)
 	newApiErr = types.InitOpenAIError(
@@ -156,6 +159,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		)
 	}
 	var errResponse dto.GeneralErrorResponse
+	upstreamErrorBody = responseBody
 	responseBodyText := string(responseBody)
 	responseBodyPreview := common.LocalLogPreview(responseBodyText)
 	buildErrWithBody := func(message string) error {
@@ -180,6 +184,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		// General format error (OpenAI, Anthropic, Gemini, etc.)
 		oaiError := errResponse.TryToOpenAIError()
 		if oaiError != nil {
+			upstreamMessage = oaiError.Message
 			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode, types.ErrOptionWithUpstreamResponse())
 			if showBodyWhenFail {
 				newApiErr.Err = buildErrWithBody(newApiErr.Error())
@@ -188,6 +193,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		}
 	}
 	message := errResponse.ToMessage()
+	upstreamMessage = message
 	if message == "" {
 		// The body parsed as JSON but carried no usable error message; log the
 		// raw body so the upstream failure remains diagnosable.

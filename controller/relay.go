@@ -613,7 +613,7 @@ func recordRelayChannelFailure(retryParam *service.RetryParam, channelID int, re
 		return
 	}
 	retryParam.ExcludedChannelIds = append(retryParam.ExcludedChannelIds, channelID)
-	if isAuthUnavailableError(relayErr) || isKnownUnavailableRouteError(relayErr) {
+	if isAuthUnavailableError(relayErr) || isKnownUnavailableRouteError(relayErr) || types.IsUpstreamClientRejected(relayErr) {
 		retryParam.AddPersistentExcludedChannel(channelID)
 	}
 }
@@ -838,6 +838,9 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int, r
 	if operation_setting.IsAlwaysSkipRetryCode(openaiErr.GetErrorCode()) {
 		return false
 	}
+	if types.IsUpstreamClientRejected(openaiErr) {
+		return len(relayFormats) > 0 && providerClientFallbackFormat(relayFormats[0])
+	}
 	if len(relayFormats) > 0 && relayFormats[0] == types.RelayFormatOpenAIImage && openaiErr.HasUpstreamResponse() {
 		return imageFailureRetryable(openaiErr)
 	}
@@ -875,6 +878,9 @@ func relayRetryIsUnsafe(c *gin.Context, info *relaycommon.RelayInfo, relayFormat
 		return true
 	}
 	if relayProgressStarted(c, info) {
+		return true
+	}
+	if types.IsUpstreamClientRejected(relayErr) && !providerClientFallbackRequestSafe(c, info, relayFormat) {
 		return true
 	}
 	if info == nil || !info.UpstreamRequestMayHaveBeenAccepted() {
