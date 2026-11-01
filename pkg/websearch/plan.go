@@ -147,8 +147,11 @@ func geminiSearchTool(t []byte) bool {
 }
 
 func (p *Plan) settings(t gjson.Result) error {
-	if v := t.Get("external_web_access"); v.Exists() && v.Type != gjson.Null && v.Raw != "true" {
-		return errors.New("DeepSeek web search requires live web access; cache-only search is unavailable")
+	// Codex defaults to cache-only search (external_web_access=false). There is
+	// no separate cached index, so both values use live DeepSeek search and the
+	// same per-call price.
+	if v := t.Get("external_web_access"); v.Exists() && v.Type != gjson.Null && v.Type != gjson.True && v.Type != gjson.False {
+		return errors.New("external_web_access must be a boolean")
 	}
 	if v := t.Get("user_location"); v.Exists() && v.Type != gjson.Null && v.Raw != "{}" {
 		return errors.New("DeepSeek web search cannot preserve user_location; specify location in the search question")
