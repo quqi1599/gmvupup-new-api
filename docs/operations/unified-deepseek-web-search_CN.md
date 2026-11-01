@@ -8,7 +8,13 @@ NewAPI 接管客户声明的服务端联网工具，原模型生成搜索词，C
 
 覆盖入口：Responses 的 web_search / web_search_preview、Claude 的 web_search / web_fetch、Chat 的 web_search_options / enable_search、Gemini Google Search / URL Context，以及 Codex `/v1/alpha/search` 的 search_query / open / find / click。Alpha Search 只调用搜索服务，不额外生成模型回答。
 
-不能由 DeepSeek Search/Fetch 提供的专用命令（例如图片搜索、PDF 截图、金融和天气工具）、缓存模式或无法保留的供应商扩展会明确报错，不回退到另一家收费搜索引擎。搜索专用模型需改用普通模型加 web_search；模型供应商或渠道参数不得在转换后重新开启原厂 hosted 搜索。
+不能由 DeepSeek Search/Fetch 提供的专用命令（例如图片搜索、PDF 截图、金融和天气工具）或无法保留的供应商扩展会明确报错，不回退到另一家实时搜索引擎。搜索专用模型需改用普通模型加 web_search；模型供应商或渠道参数不得在统一搜索转换后重新开启原厂 hosted 搜索。
+
+2026-11-01 Codex 默认缓存搜索兼容：用户明确选择“原模型缓存搜索，保留 cached 语义，沿用原有计费”。Responses 的 `web_search`（含原生版本化类型）显式携带布尔 `external_web_access:false` 时，由原模型的原生缓存搜索处理，原始工具、工具选择、位置/域名约束和输出格式保留，不进入 DeepSeek 工具循环，不额外收 DeepSeek 搜索费。原生调用继续使用既有模型与工具价格；只有实际完成的工具调用计数。客户无需改配置。原供应商仍须支持原生缓存搜索；服务端不会把 false 改为 true，也不会用空结果冒充完成搜索。
+
+没有本站旧搜索引用的缓存请求不依赖 DeepSeek 凭据或 Redis；若历史包含本站 `ws_na_` 引用，先按原 user_id/token_id 从 Redis 恢复完整工具往返，再进入原模型。过期或其他调用者的引用仍返回409，不触发模型调用。缓存工具与需要 DeepSeek 执行的实时工具在同一请求内声明时仍明确拒绝，避免混淆执行者、限制和计费；Codex 默认的单个缓存搜索工具加普通函数工具不受此限制。`web_search_preview` 的原生协议会忽略 external_web_access，因此不将其 false 当作缓存承诺。实时搜索和未声明缓存限制的搜索继续由 DeepSeek 执行。
+
+生产生效状态以固定提交的 CI、镜像和实际业务验证为准。
 
 ## 计费和交付
 

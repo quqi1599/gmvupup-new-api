@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,6 +90,9 @@ func ManagedWebHelper(c *gin.Context, info *relaycommon.RelayInfo, run func() *t
 			}
 			plan = &websearch.Plan{Protocol: protocol, Body: o, Limit: 8}
 		}
+		if plan.NativeCachedSearch {
+			return runNativeCachedSearch(c, info, run, plan)
+		}
 	}
 	if len(body) > 32<<20 {
 		return webError(errors.New("managed web request exceeds 32 MiB"), 413)
@@ -119,6 +123,52 @@ func ManagedWebHelper(c *gin.Context, info *relaycommon.RelayInfo, run func() *t
 		c.Request = c.Request.WithContext(websearch.WithAuditInput(c.Request.Context(), json.RawMessage(input.Raw)))
 	}
 	return runManagedWeb(c, info, run, body, plan, session)
+}
+
+// Preserve the provider's cached search, native events and existing tool billing.
+// Most requests need no rewrite or managed-search credentials/history store.
+func runNativeCachedSearch(c *gin.Context, info *relaycommon.RelayInfo, run func() *types.NewAPIError, plan *websearch.Plan) *types.NewAPIError {
+	hasManagedHistory := false
+	for _, item := range gjson.ParseBytes(plan.Body["input"]).Array() {
+		if strings.HasPrefix(item.Get("id").String(), "ws_na_") {
+			hasManagedHistory = true
+			break
+		}
+	}
+	if !hasManagedHistory {
+		return run()
+	}
+	if common.RDB == nil {
+		return webError(errors.New("managed web history storage is unavailable"), 503)
+	}
+	store := websearch.RedisStore{Scope: fmt.Sprintf("%d:%d", info.UserId, info.TokenId)}
+	if err := plan.Restore(c.Request.Context(), store); err != nil {
+		return webError(err, 409)
+	}
+	encoded := websearch.Raw(plan.Body)
+	replacement, err := common.CreateBodyStorage(encoded)
+	if err != nil {
+		return webError(err, 503)
+	}
+	originalStorage, err := common.GetBodyStorage(c)
+	if err != nil {
+		replacement.Close()
+		return webError(err, 503)
+	}
+	originalBody, originalLength, originalRequest := c.Request.Body, c.Request.ContentLength, info.Request
+	defer func() {
+		c.Set(common.KeyBodyStorage, originalStorage)
+		c.Request.Body, c.Request.ContentLength, info.Request = originalBody, originalLength, originalRequest
+		replacement.Close()
+	}()
+	c.Set(common.KeyBodyStorage, replacement)
+	c.Request.Body = io.NopCloser(replacement)
+	c.Request.ContentLength = int64(len(encoded))
+	info.Request, err = helper.GetAndValidateRequest(c, info.RelayFormat)
+	if err != nil {
+		return webError(err, 400)
+	}
+	return run()
 }
 
 func runManagedWeb(c *gin.Context, info *relaycommon.RelayInfo, run func() *types.NewAPIError, body []byte, plan *websearch.Plan, session *websearch.Session) (resultErr *types.NewAPIError) {

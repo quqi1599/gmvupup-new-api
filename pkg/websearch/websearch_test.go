@@ -105,7 +105,7 @@ func TestManagedPlanPreservesModelControlsAndNumbers(t *testing.T) {
 	require.NotContains(t, string(encoded), `"type":"web_search"`)
 }
 func TestManagedPlanRejectsLostSemanticsAndDoesNotStealClientFunction(t *testing.T) {
-	for _, tool := range []string{`{"type":"web_search","external_web_access":false}`, `{"type":"web_search","user_location":{"city":"Paris"}}`, `{"type":"web_search","max_uses":0}`, `{"type":"web_search","max_uses":1.5}`, `{"type":"web_search","filters":{"allowed_domains":["x.com OR evil"]}}`} {
+	for _, tool := range []string{`{"type":"web_search","user_location":{"city":"Paris"}}`, `{"type":"web_search","max_uses":0}`, `{"type":"web_search","max_uses":1.5}`, `{"type":"web_search","filters":{"allowed_domains":["x.com OR evil"]}}`} {
 		_, err := NewPlan([]byte(`{"tools":[`+tool+`]}`), "responses")
 		require.Error(t, err)
 	}

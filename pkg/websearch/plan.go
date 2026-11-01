@@ -33,6 +33,7 @@ type Plan struct {
 	OriginalTools              json.RawMessage
 	OriginalToolChoice         json.RawMessage
 	Search, Fetch              bool
+	NativeCachedSearch         bool
 	Limit                      int
 	SearchLimit, FetchLimit    int
 	FetchAllowed, FetchBlocked []string
@@ -51,12 +52,21 @@ func NewPlan(body []byte, protocol string) (*Plan, error) {
 		return nil, errors.New("search-only models cannot use an external search provider; select a general model with a web_search tool")
 	}
 	tools := Arr(o["tools"])
+	seenSearch := false
 	for _, raw := range tools {
 		t := gjson.ParseBytes(raw)
 		typ := t.Get("type").String()
 		if typ == "web_search" || strings.HasPrefix(typ, "web_search_") {
-			if p.Search {
+			if seenSearch {
 				return nil, errors.New("duplicate hosted web search tool")
+			}
+			seenSearch = true
+			// Cache-only search belongs to the original Responses provider.
+			// DeepSeek has no cache-only API, so never promote false to live.
+			// Preview tools do not honor external_web_access in the native API.
+			if protocol == "responses" && !strings.HasPrefix(typ, "web_search_preview") && t.Get("external_web_access").Type == gjson.False {
+				p.NativeCachedSearch = true
+				continue
 			}
 			p.Search = true
 			p.Fetch = true
@@ -133,6 +143,12 @@ func NewPlan(body []byte, protocol string) (*Plan, error) {
 			}
 		}
 	}
+	if p.NativeCachedSearch {
+		if p.Search || p.Fetch {
+			return nil, errors.New("native cached search cannot be combined with managed live web tools in one request")
+		}
+		return p, nil
+	}
 	if !p.Search && !p.Fetch {
 		return nil, nil
 	}
@@ -189,6 +205,9 @@ func validDomain(s string) bool {
 }
 
 func (p *Plan) Tools() error {
+	if p.NativeCachedSearch {
+		return errors.New("native cached search must use the original provider without managed tool conversion")
+	}
 	var kept []json.RawMessage
 	for _, raw := range Arr(p.Body["tools"]) {
 		t := gjson.ParseBytes(raw)
