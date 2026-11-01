@@ -410,7 +410,7 @@ func TestStreamScannerHandler_ClientGoneClosesUpstreamBodyBeforeWaiting(t *testi
 
 	body := newBlockingReadCloser(fmt.Errorf("read tcp 192.168.135.228:1572->192.168.191.54:8317: use of closed network connection"))
 	resp := &http.Response{Body: body}
-	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+	info := &relaycommon.RelayInfo{IsStream: true, RelayFormat: types.RelayFormatOpenAIResponses, ChannelMeta: &relaycommon.ChannelMeta{}}
 
 	done := make(chan struct{})
 	start := time.Now()

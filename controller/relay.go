@@ -339,6 +339,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		common.SetContextKey(c, constant.ContextKeyRelayConnectedUpstream, false)
 		common.SetContextKey(c, constant.ContextKeyRelayRequestWritten, false)
 		common.SetContextKey(c, constant.ContextKeyRelayResponseHeaders, false)
+		common.SetContextKey(c, constant.ContextKeyUpstreamResponseDiagnostic, nil)
+		common.SetContextKey(c, constant.ContextKeyUpstreamRequestStream, "not_observed")
 		setRelayRetryDiagnostics(c, retryState)
 		addUsedChannel(c, channel.Id)
 		if billingErr := service.PrepareTieredBillingForSelectedGroup(c, relayInfo); billingErr != nil {

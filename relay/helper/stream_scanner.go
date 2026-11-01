@@ -275,10 +275,18 @@ func StreamScannerHandlerWithDecoder(c *gin.Context, resp *http.Response, info *
 
 	streamingTimeout := getStreamingTimeout()
 	firstEventTimeout := info.BoundFirstValidEventWait(getFirstEventTimeout())
+	var bodyReader io.Reader = resp.Body
+	var observation *streamResponseObservation
+	if info.RelayFormat == types.RelayFormatOpenAIResponses {
+		// A later model round must not inherit a previous round's observation.
+		common.SetContextKey(c, constant.ContextKeyUpstreamResponseDiagnostic, nil)
+		observation = newStreamResponseObservation(resp, info.IsStream, common.GetContextKeyString(c, constant.ContextKeyUpstreamRequestStream))
+		bodyReader = io.TeeReader(resp.Body, observation)
+	}
 
 	var (
 		stopChan            = make(chan bool, 3) // 增加缓冲区避免阻塞
-		scanner             = NewStreamScanner(resp.Body)
+		scanner             = NewStreamScanner(bodyReader)
 		streamTimer         = time.NewTimer(firstEventTimeout)
 		writeMutex          sync.Mutex     // Mutex to protect concurrent writes
 		wg                  sync.WaitGroup // 用于等待所有 goroutine 退出
@@ -504,6 +512,9 @@ func StreamScannerHandlerWithDecoder(c *gin.Context, resp *http.Response, info *
 			}
 
 			line := scanner.Text()
+			if observation != nil {
+				observation.observeLine(line)
+			}
 			if common.DebugEnabled {
 				println(line)
 			}
@@ -602,6 +613,16 @@ func StreamScannerHandlerWithDecoder(c *gin.Context, resp *http.Response, info *
 
 	cleanup()
 	markStreamScannerCompleted(c, info)
+	if observation != nil {
+		diagnostic := observation.snapshot()
+		// Only pre-event failures need the extra admin-only error metadata.
+		// Do not add per-response log volume to normal or already-started streams.
+		if !firstEventSeen.Load() && !info.StreamStatus.IsNormalEnd() {
+			diagnostic.EndReason = string(info.StreamStatus.EndReason)
+			diagnostic.SoftErrors = info.StreamStatus.TotalErrorCount()
+			common.SetContextKey(c, constant.ContextKeyUpstreamResponseDiagnostic, &diagnostic)
+		}
+	}
 	if info.StreamStatus.IsNormalEnd() && !info.StreamStatus.HasErrors() {
 		logger.LogInfo(c, fmt.Sprintf("stream ended: %s", info.StreamStatus.Summary()))
 	} else {

@@ -146,6 +146,9 @@ func AppendRelayObservabilityAdminInfo(ctx *gin.Context, relayInfo *relaycommon.
 	if seconds := common.GetContextKeyInt(ctx, constant.ContextKeyRelayTimeoutSeconds); seconds > 0 {
 		adminInfo["timeout_seconds"] = seconds
 	}
+	if diagnostic, ok := common.GetContextKeyType[*types.UpstreamResponseDiagnostic](ctx, constant.ContextKeyUpstreamResponseDiagnostic); ok && diagnostic != nil {
+		adminInfo["upstream_response"] = *diagnostic
+	}
 	outputStarted := common.GetContextKeyBool(ctx, constant.ContextKeyRelayOutputStarted)
 	if ctx.Writer != nil && ctx.Writer.Written() {
 		outputStarted = true

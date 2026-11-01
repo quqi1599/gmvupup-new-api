@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,6 +16,7 @@ func TestFormatUserLogsStripsQuotaSaturation(t *testing.T) {
 	other := common.MapToJsonStr(map[string]interface{}{
 		"model_price": 0.004,
 		"admin_info": map[string]interface{}{
+			"upstream_response": types.UpstreamResponseDiagnostic{BodyPrefix: "json_like", ReadBytes: 100},
 			"quota_saturation": map[string]interface{}{
 				"op":      "QuotaFromDecimal",
 				"kind":    "overflow",
@@ -30,6 +32,7 @@ func TestFormatUserLogsStripsQuotaSaturation(t *testing.T) {
 	require.NoError(t, err)
 	_, hasAdminInfo := parsed["admin_info"]
 	require.False(t, hasAdminInfo, "admin_info (and nested quota_saturation) must be stripped for non-admin views")
+	require.NotContains(t, logs[0].Other, "upstream_response")
 	// Non-admin billing fields remain visible.
 	require.Contains(t, parsed, "model_price")
 }

@@ -26,12 +26,14 @@ import (
 )
 
 type streamResilienceFixture struct {
-	cached             bool
-	first              string
-	middle             string
-	maxAttempts        int
-	emptyCandidates    int
-	allCandidatesEmpty bool
+	cached              bool
+	first               string
+	middle              string
+	maxAttempts         int
+	emptyCandidates     int
+	allCandidatesEmpty  bool
+	errorLog            bool
+	overrideStreamFalse bool
 }
 
 type streamResilienceResult struct {
@@ -55,6 +57,8 @@ func runStreamResilienceRelay(t *testing.T, fixture streamResilienceFixture) str
 		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(oldGroup))
 	})
 	common.RetryTimes, common.LogConsumeEnabled, constant.ErrorLogEnabled = 3, false, false
+	common.LogConsumeEnabled = fixture.errorLog
+	constant.ErrorLogEnabled = fixture.errorLog
 	operation_setting.GetQuotaSetting().EnableFreeModelPreConsume = false
 	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"default":0}`))
 	if fixture.maxAttempts == 0 {
@@ -69,6 +73,14 @@ func runStreamResilienceRelay(t *testing.T, fixture streamResilienceFixture) str
 	oldRedis, oldClient := common.RedisEnabled, common.RDB
 	common.RedisEnabled, common.RDB = true, client
 	t.Cleanup(func() { common.RedisEnabled, common.RDB = oldRedis, oldClient; _ = client.Close() })
+	if fixture.errorLog {
+		// Error logging reads user settings. Warm a complete synthetic user
+		// synchronously so test cleanup cannot race an asynchronous cache fill.
+		require.NoError(t, model.DB.Create(&model.User{Id: 927147, Username: "response-diagnostic-test",
+			Status: common.UserStatusEnabled, Group: "default", Setting: "{}"}).Error)
+		_, err := model.GetUserCache(927147)
+		require.NoError(t, err)
+	}
 
 	requestCtx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -85,6 +97,11 @@ func runStreamResilienceRelay(t *testing.T, fixture streamResilienceFixture) str
 			calls = append(calls, id)
 			mu.Unlock()
 			if id == 9 {
+				if fixture.errorLog {
+					var request map[string]interface{}
+					require.NoError(t, common.DecodeJson(r.Body, &request))
+					require.Equal(t, !fixture.overrideStreamFalse, request["stream"])
+				}
 				switch fixture.first {
 				case "created_then_close":
 					w.Header().Set("Content-Type", "text/event-stream")
@@ -109,6 +126,10 @@ func runStreamResilienceRelay(t *testing.T, fixture streamResilienceFixture) str
 				case "empty_stream":
 					w.Header().Set("Content-Type", "text/event-stream")
 					w.WriteHeader(http.StatusOK)
+					return
+				case "json_in_stream":
+					w.Header().Set("Content-Type", "application/json; private=HEADER_SECRET")
+					_, _ = fmt.Fprint(w, `{"error":{"message":"BODY_SECRET"}}`)
 					return
 				case "cancel":
 					cancel()
@@ -136,6 +157,9 @@ func runStreamResilienceRelay(t *testing.T, fixture streamResilienceFixture) str
 		channel := model.Channel{Id: id, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled,
 			Group: "default", Models: "gpt-5.6-sol", Priority: &priority, BaseURL: &server.URL,
 			Key: "synthetic-key", AutoBan: common.GetPointer(0)}
+		if fixture.overrideStreamFalse {
+			channel.ParamOverride = common.GetPointer(`{"stream":false}`)
+		}
 		if id > 9 && (id < healthyID || fixture.allCandidatesEmpty) {
 			switch fixture.middle {
 			case "no_enabled_key":
@@ -160,6 +184,9 @@ func runStreamResilienceRelay(t *testing.T, fixture streamResilienceFixture) str
 	}
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
+	if fixture.errorLog {
+		c.Set("id", 927147)
+	}
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"gpt-5.6-sol","input":"synthetic","stream":true}`)).WithContext(requestCtx)
 	c.Request.Header.Set("Content-Type", "application/json")
 	common.SetContextKey(c, constant.ContextKeyUsingGroup, "default")
@@ -192,6 +219,48 @@ func TestStreamResilienceSkipsUnusableCandidateBeforeHealthyFallback(t *testing.
 			})
 		}
 	}
+}
+
+func TestStreamResponseDiagnosticPersistsWithoutReplayOrBody(t *testing.T) {
+	got := runStreamResilienceRelay(t, streamResilienceFixture{first: "json_in_stream", errorLog: true})
+	require.Equal(t, []int{9}, got.calls)
+	require.Equal(t, http.StatusBadGateway, got.response.Code)
+	require.Equal(t, service.RetryStopReasonUpstreamUnknown, got.context.GetString("retry_stop_reason"))
+	require.NotContains(t, got.response.Body.String(), "BODY_SECRET")
+	var logs []model.Log
+	require.NoError(t, model.LOG_DB.Order("id").Find(&logs).Error)
+	require.Len(t, logs, 1)
+	require.Equal(t, model.LogTypeError, logs[0].Type)
+	require.Zero(t, logs[0].Quota)
+	var metadata struct {
+		Admin struct {
+			Attempt  int                              `json:"attempt_no"`
+			Response types.UpstreamResponseDiagnostic `json:"upstream_response"`
+		} `json:"admin_info"`
+	}
+	require.NoError(t, common.UnmarshalJsonStr(logs[0].Other, &metadata))
+	require.Equal(t, 1, metadata.Admin.Attempt)
+	require.Equal(t, "application/json", metadata.Admin.Response.ContentType)
+	require.Equal(t, "json_like", metadata.Admin.Response.BodyPrefix)
+	require.Equal(t, "true", metadata.Admin.Response.RequestStream)
+	require.Equal(t, "eof", metadata.Admin.Response.EndReason)
+	require.Positive(t, metadata.Admin.Response.ReadBytes)
+	for _, secret := range []string{"BODY_SECRET", "HEADER_SECRET"} {
+		require.NotContains(t, logs[0].Other, secret)
+		require.NotContains(t, logs[0].Content, secret)
+	}
+}
+
+func TestStreamResponseDiagnosticObservesFinalStreamOverride(t *testing.T) {
+	got := runStreamResilienceRelay(t, streamResilienceFixture{first: "json_in_stream", errorLog: true, overrideStreamFalse: true})
+	require.Equal(t, []int{9}, got.calls)
+	require.Equal(t, http.StatusBadGateway, got.response.Code)
+	d, ok := common.GetContextKeyType[*types.UpstreamResponseDiagnostic](got.context, constant.ContextKeyUpstreamResponseDiagnostic)
+	require.True(t, ok)
+	require.NotNil(t, d)
+	require.True(t, d.StreamExpected)
+	require.Equal(t, "false", d.RequestStream, "observe the encoded upstream request after parameter overrides")
+	require.Equal(t, service.RetryStopReasonUpstreamUnknown, got.context.GetString("retry_stop_reason"))
 }
 
 func TestStreamResilienceDoesNotReplayUnsafeOrTerminalFailure(t *testing.T) {

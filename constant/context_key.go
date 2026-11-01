@@ -21,6 +21,8 @@ const (
 	ContextKeyRelayGatewayNoReplayReason ContextKey = "relay_gateway_no_replay_reason"
 	ContextKeyRelayTimeoutPhase          ContextKey = "relay_timeout_phase"
 	ContextKeyRelayTimeoutSeconds        ContextKey = "relay_timeout_seconds"
+	ContextKeyUpstreamResponseDiagnostic ContextKey = "upstream_response_diagnostic"
+	ContextKeyUpstreamRequestStream      ContextKey = "upstream_request_stream"
 
 	/* token related keys */
 	ContextKeyTokenUnlimited         ContextKey = "token_unlimited_quota"
