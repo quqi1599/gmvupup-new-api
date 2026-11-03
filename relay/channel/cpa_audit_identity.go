@@ -17,22 +17,26 @@ const (
 	cpaAuditIdentitySecretEnv = "CPA_AUDIT_IDENTITY_SECRET"
 	cpaAuditHeaderPrefix      = "x-cpa-audit-"
 	cpaAuditVersion           = "1"
+	cpaAuditPlaygroundVersion = "2"
+	cpaAuditPlaygroundKind    = "playground"
+	cpaAuditPlaygroundName    = "__playground__"
 
-	cpaAuditHeaderVersion     = "X-CPA-Audit-Version"
-	cpaAuditHeaderUserID      = "X-CPA-Audit-User-ID"
-	cpaAuditHeaderTokenID     = "X-CPA-Audit-Token-ID"
-	cpaAuditHeaderTokenName   = "X-CPA-Audit-Token-Name"
-	cpaAuditHeaderRequestID   = "X-CPA-Audit-Request-ID"
-	cpaAuditHeaderTimestamp   = "X-CPA-Audit-Timestamp"
-	cpaAuditHeaderModel       = "X-CPA-Audit-Model"
-	cpaAuditHeaderChannelTest = "X-CPA-Audit-Channel-Test"
-	cpaAuditHeaderSignature   = "X-CPA-Audit-Signature"
+	cpaAuditHeaderIdentityKind = "X-CPA-Audit-Identity-Kind"
+	cpaAuditHeaderVersion      = "X-CPA-Audit-Version"
+	cpaAuditHeaderUserID       = "X-CPA-Audit-User-ID"
+	cpaAuditHeaderTokenID      = "X-CPA-Audit-Token-ID"
+	cpaAuditHeaderTokenName    = "X-CPA-Audit-Token-Name"
+	cpaAuditHeaderRequestID    = "X-CPA-Audit-Request-ID"
+	cpaAuditHeaderTimestamp    = "X-CPA-Audit-Timestamp"
+	cpaAuditHeaderModel        = "X-CPA-Audit-Model"
+	cpaAuditHeaderChannelTest  = "X-CPA-Audit-Channel-Test"
+	cpaAuditHeaderSignature    = "X-CPA-Audit-Signature"
 )
 
 func stripCPAAuditHeaders(header http.Header) {
 	for name := range header {
 		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(name)), cpaAuditHeaderPrefix) {
-			header.Del(name)
+			delete(header, name)
 		}
 	}
 }
@@ -57,7 +61,14 @@ func sanitizeCPAAuditHeaderValue(value string, maxRunes int) string {
 }
 
 func cpaAuditCanonicalValues(version, timestamp, requestID, userID, tokenID, tokenName, method, path, model, channelTest string) string {
+	return cpaAuditCanonicalIdentityValues(version, timestamp, requestID, userID, tokenID, tokenName, method, path, model, channelTest, "")
+}
+
+func cpaAuditCanonicalIdentityValues(version, timestamp, requestID, userID, tokenID, tokenName, method, path, model, channelTest, identityKind string) string {
 	values := url.Values{}
+	if identityKind != "" {
+		values.Set("identity_kind", identityKind)
+	}
 	values.Set("channel_test", channelTest)
 	values.Set("method", strings.ToUpper(strings.TrimSpace(method)))
 	values.Set("model", model)
@@ -85,7 +96,12 @@ func applyCPAAuditIdentityHeaders(header http.Header, method, rawURL string, inf
 			types.ErrOptionWithSkipRetry(),
 		)
 	}
-	if !info.IsChannelTest && (info.UserId <= 0 || info.TokenId <= 0 || strings.TrimSpace(info.RequestId) == "") {
+	// Only the session-authenticated /pg route sets IsPlayground, never client headers.
+	invalidIdentity := info.UserId <= 0 || sanitizeCPAAuditHeaderValue(info.RequestId, 128) == "" || info.TokenId <= 0
+	if info.IsPlayground {
+		invalidIdentity = info.IsChannelTest || info.UserId <= 0 || info.TokenId != 0 || sanitizeCPAAuditHeaderValue(info.RequestId, 128) == ""
+	}
+	if (info.IsPlayground || !info.IsChannelTest) && invalidIdentity {
 		return types.NewError(
 			fmt.Errorf("CPA audit identity requires user_id, token_id, and request_id"),
 			types.ErrorCodeChannelCPAAuditIdentityInvalid,
@@ -106,9 +122,16 @@ func applyCPAAuditIdentityHeaders(header http.Header, method, rawURL string, inf
 		path = "/"
 	}
 
+	version, identityKind := cpaAuditVersion, ""
+	if info.IsPlayground {
+		version, identityKind = cpaAuditPlaygroundVersion, cpaAuditPlaygroundKind
+	}
 	timestamp := strconv.FormatInt(now.Unix(), 10)
 	requestID := sanitizeCPAAuditHeaderValue(info.RequestId, 128)
 	tokenName := sanitizeCPAAuditHeaderValue(info.TokenName, 128)
+	if info.IsPlayground {
+		tokenName = cpaAuditPlaygroundName
+	}
 	userIDValue := info.UserId
 	tokenIDValue := info.TokenId
 	if info.IsChannelTest {
@@ -129,8 +152,8 @@ func applyCPAAuditIdentityHeaders(header http.Header, method, rawURL string, inf
 	if info.IsChannelTest {
 		channelTest = "1"
 	}
-	canonical := cpaAuditCanonicalValues(
-		cpaAuditVersion,
+	canonical := cpaAuditCanonicalIdentityValues(
+		version,
 		timestamp,
 		requestID,
 		userID,
@@ -140,9 +163,13 @@ func applyCPAAuditIdentityHeaders(header http.Header, method, rawURL string, inf
 		path,
 		model,
 		channelTest,
+		identityKind,
 	)
 
-	header.Set(cpaAuditHeaderVersion, cpaAuditVersion)
+	header.Set(cpaAuditHeaderVersion, version)
+	if identityKind != "" {
+		header.Set(cpaAuditHeaderIdentityKind, identityKind)
+	}
 	header.Set(cpaAuditHeaderUserID, userID)
 	header.Set(cpaAuditHeaderTokenID, tokenID)
 	header.Set(cpaAuditHeaderTokenName, tokenName)
@@ -173,7 +200,7 @@ func applyCPAAuditIdentity(req *http.Request, info *common.RelayInfo) error {
 // ApplyManagedWebAudit signs verified caller identity for the dedicated CPA
 // search endpoint, independently of the selected model channel's vendor.
 func ApplyManagedWebAudit(req *http.Request, info *common.RelayInfo) error {
-	identity := &common.RelayInfo{UserId: info.UserId, TokenId: info.TokenId, TokenName: info.TokenName, RequestId: info.RequestId, IsChannelTest: info.IsChannelTest, ChannelMeta: &common.ChannelMeta{}}
+	identity := &common.RelayInfo{UserId: info.UserId, TokenId: info.TokenId, TokenName: info.TokenName, RequestId: info.RequestId, IsChannelTest: info.IsChannelTest, IsPlayground: info.IsPlayground, ChannelMeta: &common.ChannelMeta{}}
 	identity.ChannelOtherSettings.CPAAuditIdentityEnabled = true
 	return applyCPAAuditIdentity(req, identity)
 }

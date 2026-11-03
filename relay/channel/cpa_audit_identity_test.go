@@ -107,3 +107,59 @@ func TestShouldSkipPassthroughHeaderRejectsCPAIdentityNamespace(t *testing.T) {
 	require.True(t, shouldSkipPassthroughHeader("X-CPA-Audit-User-ID"))
 	require.True(t, shouldSkipPassthroughHeader("x-cpa-audit-signature"))
 }
+
+func TestPlaygroundAuditIdentityV2GoldenContract(t *testing.T) {
+	info := &relaycommon.RelayInfo{UserId: 42, IsPlayground: true, RequestId: "req-pg", OriginModelName: "claude-sonnet-4-6", ChannelMeta: &relaycommon.ChannelMeta{}}
+	info.ChannelOtherSettings.CPAAuditIdentityEnabled = true
+	header := http.Header{"x-cpa-audit-user-id": {"999"}, "X-CPA-Audit-Identity-Kind": {"forged"}, "X-CPA-Audit-Channel-Test": {"1"}}
+	require.NoError(t, applyCPAAuditIdentityHeaders(header, "POST", "https://cpa.example/v1/chat/completions", info, time.Unix(1800000000, 0), "shared-secret"))
+	require.Equal(t, "2", header.Get(cpaAuditHeaderVersion))
+	require.Equal(t, "playground", header.Get(cpaAuditHeaderIdentityKind))
+	require.Equal(t, "42", header.Get(cpaAuditHeaderUserID))
+	require.Equal(t, "0", header.Get(cpaAuditHeaderTokenID))
+	require.Equal(t, "__playground__", header.Get(cpaAuditHeaderTokenName))
+	require.Empty(t, header.Get(cpaAuditHeaderChannelTest))
+	require.NotContains(t, header, "x-cpa-audit-user-id")
+	// Independently computed fixed vector, also consumed by CPA's verifier test.
+	require.Equal(t, "d488ce87fc05402b1e47dee1eca3bc0850d859335bf912fe8f324ec393f74e78", header.Get(cpaAuditHeaderSignature))
+}
+
+func TestPlaygroundAuditIdentityRejectsMissingOrConflictingIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*relaycommon.RelayInfo)
+	}{
+		{"no session user", func(i *relaycommon.RelayInfo) { i.UserId = 0 }},
+		{"negative token", func(i *relaycommon.RelayInfo) { i.TokenId = -1 }},
+		{"real token", func(i *relaycommon.RelayInfo) { i.TokenId = 73 }},
+		{"channel test", func(i *relaycommon.RelayInfo) { i.IsChannelTest = true }},
+		{"missing request", func(i *relaycommon.RelayInfo) { i.RequestId = "" }},
+		{"empty after sanitizing", func(i *relaycommon.RelayInfo) { i.RequestId = "\r\n\x00" }},
+		{"ordinary request without token", func(i *relaycommon.RelayInfo) { i.IsPlayground = false }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := &relaycommon.RelayInfo{UserId: 42, IsPlayground: true, RequestId: "req-pg", ChannelMeta: &relaycommon.ChannelMeta{}}
+			info.ChannelOtherSettings.CPAAuditIdentityEnabled = true
+			tc.change(info)
+			header := http.Header{"X-CPA-Audit-Signature": {"forged"}, "x-cpa-audit-identity-kind": {"playground"}}
+			err := applyCPAAuditIdentityHeaders(header, "POST", "https://cpa.example/v1/chat/completions", info, time.Now(), "shared-secret")
+			require.Error(t, err)
+			require.Empty(t, header)
+		})
+	}
+}
+
+func TestManagedWebAuditPreservesPlaygroundIdentity(t *testing.T) {
+	old := common2.CPAAuditIdentitySecret
+	common2.CPAAuditIdentitySecret = "synthetic-managed-web-secret"
+	t.Cleanup(func() { common2.CPAAuditIdentitySecret = old })
+	req, err := http.NewRequest("POST", "https://cpa.example/v1/tools/web/search", nil)
+	require.NoError(t, err)
+	info := &relaycommon.RelayInfo{UserId: 42, IsPlayground: true, RequestId: "req-pg"}
+	require.NoError(t, ApplyManagedWebAudit(req, info))
+	require.Equal(t, "2", req.Header.Get(cpaAuditHeaderVersion))
+	require.Equal(t, "playground", req.Header.Get(cpaAuditHeaderIdentityKind))
+	require.Equal(t, "42", req.Header.Get(cpaAuditHeaderUserID))
+	require.Equal(t, "0", req.Header.Get(cpaAuditHeaderTokenID))
+	require.NotEmpty(t, req.Header.Get(cpaAuditHeaderSignature))
+}

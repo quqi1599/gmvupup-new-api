@@ -429,6 +429,9 @@ func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		targetHeader.Set(key, value)
 	}
 	applyCPAPrincipal(targetHeader, info)
+	if err := requirePlaygroundCPAPrincipal(targetHeader, info); err != nil {
+		return nil, err
+	}
 	if err = applyCPAAuditIdentityHeaders(targetHeader, c.Request.Method, fullRequestURL, info, time.Now(), common2.CPAAuditIdentitySecret); err != nil {
 		return nil, fmt.Errorf("apply CPA audit identity: %w", err)
 	}
@@ -996,6 +999,9 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 	stripCPARetryRequestHeaders(req.Header)
 	applyCPAPrincipal(req.Header, info)
+	if err := requirePlaygroundCPAPrincipal(req.Header, info); err != nil {
+		return nil, err
+	}
 	if err := applyCPAAuditIdentity(req, info); err != nil {
 		return nil, fmt.Errorf("apply CPA audit identity: %w", err)
 	}

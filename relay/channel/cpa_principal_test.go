@@ -99,3 +99,31 @@ func TestCPAPrincipalRemovesSpoofWithoutAuthenticatedIdentity(t *testing.T) {
 		require.Empty(t, header, "unconfigured instances must not share a replay principal")
 	}
 }
+
+func TestPlaygroundPrincipalSeparatesUsersTokensAndInstallations(t *testing.T) {
+	info := &relaycommon.RelayInfo{UserId: 42, IsPlayground: true, ChannelMeta: &relaycommon.ChannelMeta{ApiKey: "synthetic-key"}}
+	info.ChannelOtherSettings.CPAAuditIdentityEnabled = true
+	claim := func(authority string) string {
+		h := http.Header{cpaPrincipalHeader: {"forged"}}
+		applyCPAPrincipalHeader(h, info, authority)
+		require.NoError(t, requirePlaygroundCPAPrincipal(h, info))
+		return h.Get(cpaPrincipalHeader)
+	}
+	first := claim("https://newapi.example")
+	require.Equal(t, first, claim("https://newapi.example"))
+	info.UserId++
+	require.NotEqual(t, first, claim("https://newapi.example"))
+	info.UserId--
+	require.NotEqual(t, first, claim("https://other.example"))
+	info.IsPlayground = false
+	info.TokenId = 42
+	require.NotEqual(t, first, claim("https://newapi.example"))
+	info.IsPlayground = true
+	info.TokenId = 0
+	for _, authority := range []string{"", "http://localhost:3000", "not-an-authority"} {
+		h := http.Header{cpaPrincipalHeader: {"forged"}}
+		applyCPAPrincipalHeader(h, info, authority)
+		require.Empty(t, h)
+		require.Error(t, requirePlaygroundCPAPrincipal(h, info))
+	}
+}

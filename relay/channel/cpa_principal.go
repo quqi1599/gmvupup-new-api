@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/QuantumNous/new-api/types"
 )
 
 const cpaPrincipalHeader = "X-CPA-Principal"
@@ -25,7 +27,7 @@ func applyCPAPrincipalHeader(header http.Header, info *relaycommon.RelayInfo, au
 			delete(header, name)
 		}
 	}
-	if info == nil || info.ChannelMeta == nil || info.UserId <= 0 || info.TokenId <= 0 || info.IsChannelTest || info.ApiKey == "" {
+	if info == nil || info.ChannelMeta == nil || info.UserId <= 0 || (!info.IsPlayground && info.TokenId <= 0) || (info.IsPlayground && info.TokenId != 0) || info.IsChannelTest || info.ApiKey == "" {
 		return
 	}
 	authority = strings.TrimRight(strings.TrimSpace(authority), "/")
@@ -43,10 +45,26 @@ func applyCPAPrincipalHeader(header http.Header, info *relaycommon.RelayInfo, au
 	mac := hmac.New(sha256.New, []byte(info.ApiKey))
 	// NUL-delimited fields and a versioned domain prevent concatenation and
 	// cross-purpose collisions. The transmitted claim contains no plaintext ID.
-	_, _ = mac.Write([]byte("newapi/cpa-principal/v1\x00" + authority + "\x00" + strconv.Itoa(info.UserId) + "\x00" + strconv.Itoa(info.TokenId)))
+	subject := "newapi/cpa-principal/v1\x00" + authority + "\x00" + strconv.Itoa(info.UserId) + "\x00" + strconv.Itoa(info.TokenId)
+	if info.IsPlayground {
+		subject = "newapi/cpa-principal/playground/v1\x00" + authority + "\x00" + strconv.Itoa(info.UserId)
+	}
+	_, _ = mac.Write([]byte(subject))
 	header.Set(cpaPrincipalHeader, hex.EncodeToString(mac.Sum(nil)))
 }
 
 func applyCPAPrincipal(header http.Header, info *relaycommon.RelayInfo) {
 	applyCPAPrincipalHeader(header, info, system_setting.ServerAddress)
+}
+
+// Model history must not fall back to the shared CPA credential's owner when
+// a session-authenticated playground request cannot name its relay tenant.
+func requirePlaygroundCPAPrincipal(header http.Header, info *relaycommon.RelayInfo) error {
+	if info == nil || info.ChannelMeta == nil || !info.IsPlayground || !info.ChannelOtherSettings.CPAAuditIdentityEnabled {
+		return nil
+	}
+	if len(header.Get(cpaPrincipalHeader)) != 64 {
+		return types.NewError(fmt.Errorf("CPA playground identity requires a configured public server address and valid user identity"), types.ErrorCodeChannelCPAAuditIdentityInvalid, types.ErrOptionWithSkipRetry())
+	}
+	return nil
 }
