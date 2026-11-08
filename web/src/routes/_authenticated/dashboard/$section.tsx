@@ -23,6 +23,7 @@ import {
   DASHBOARD_SECTION_IDS,
   DASHBOARD_DEFAULT_SECTION,
 } from '@/features/dashboard/section-registry'
+import { GmvupupModelCatalog } from '@/features/gmvupup-console'
 
 export const Route = createFileRoute('/_authenticated/dashboard/$section')({
   beforeLoad: ({ params }) => {
@@ -34,5 +35,10 @@ export const Route = createFileRoute('/_authenticated/dashboard/$section')({
       })
     }
   },
-  component: Dashboard,
+  component: DashboardSection,
 })
+
+function DashboardSection() {
+  const { section } = Route.useParams()
+  return section === 'overview' ? <GmvupupModelCatalog /> : <Dashboard />
+}

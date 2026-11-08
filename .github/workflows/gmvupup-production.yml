@@ -83,7 +83,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run typecheck
-          bunx --no-install vitest run src/features/gmvupup/__tests__/homepage.test.tsx src/features/gmvupup-docs/__tests__/documentation.test.tsx
+          bunx --no-install vitest run src/features/gmvupup/__tests__/homepage.test.tsx src/features/gmvupup-docs/__tests__/documentation.test.tsx src/features/gmvupup-console/__tests__ src/features/pricing/__tests__/model-cards.test.tsx src/features/pricing/__tests__/dynamic-price.test.ts src/features/wallet/__tests__/copy.test.tsx
 
       - name: Isolate Docker registry credentials
         run: |

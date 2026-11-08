@@ -25,7 +25,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -34,7 +34,6 @@ import en from '@/i18n/locales/en.json'
 import zh from '@/i18n/locales/zh.json'
 import { STATUS_QUERY_KEY } from '@/lib/status-query'
 
-import { API_EXAMPLES } from '../api-examples'
 import { GmvupupHome } from '../index'
 
 async function renderHomepage(isAuthenticated = false) {
@@ -86,92 +85,31 @@ beforeEach(async () => {
 })
 
 describe('GMVUPUP public homepage', () => {
-  it('switches creative formats with keyboard and exposes the selected panel', async () => {
-    const user = userEvent.setup()
-    await renderHomepage()
-    const tabs = screen.getByRole('tablist', { name: 'Creative formats' })
-    const video = within(tabs).getByRole('tab', { name: 'Video creation' })
-    video.focus()
-    await user.keyboard('{ArrowRight}{Enter}')
-    const image = within(tabs).getByRole('tab', { name: 'Image creation' })
-    await waitFor(() => expect(image).toHaveAttribute('aria-selected', 'true'))
-    expect(
-      screen.getByRole('heading', { name: /Make the first impression/ })
-    ).toBeVisible()
-    expect(
-      screen.queryByRole('heading', { name: /Give your product/ })
-    ).not.toBeInTheDocument()
-  })
-
-  it('copies the currently selected code example without making an API request', async () => {
-    const user = userEvent.setup()
-    await renderHomepage()
-    await user.click(screen.getByRole('tab', { name: 'Python' }))
-    await user.click(screen.getByRole('button', { name: 'Copy code example' }))
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Copied' })).toBeVisible()
-    )
-    expect(await navigator.clipboard.readText()).toBe(API_EXAMPLES.python)
-    await user.click(screen.getByRole('tab', { name: 'cURL' }))
-    expect(screen.getByLabelText('Video API example')).toHaveTextContent(
-      'curl https://gmvupup.top/v1/videos'
-    )
-    expect(API_EXAMPLES.curl).not.toContain('\n+')
-  })
-
-  it('opens mobile navigation and closes it when documentation is selected', async () => {
-    const user = userEvent.setup()
-    await renderHomepage()
-    await user.click(screen.getByRole('button', { name: 'Open navigation' }))
-    const dialog = screen.getByRole('dialog')
-    expect(
-      within(dialog).getByRole('navigation', { name: 'Mobile navigation' })
-    ).toBeVisible()
-    await user.click(
-      within(dialog).getByRole('link', { name: 'API documentation' })
-    )
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    )
-  })
-
-  it('sends a new visitor to the real registration route', async () => {
-    const user = userEvent.setup()
-    const router = await renderHomepage()
-    await user.click(screen.getByRole('button', { name: 'Start creating' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/sign-up'))
-  })
-
-  it('sends an authenticated visitor to the dashboard and preserves project attribution', async () => {
-    await renderHomepage(true)
-    for (const link of screen.getAllByRole('button', {
-      name: 'Open console',
-    })) {
-      expect(link).toHaveAttribute('href', '/dashboard')
-    }
-    expect(
-      screen.getByRole('link', { name: 'New API contributors.' })
-    ).toHaveAttribute('href', 'https://github.com/QuantumNous/new-api')
-    expect(screen.getByText(/Frontend design and development by/)).toBeVisible()
-  })
-
-  it('updates the homepage when Chinese is selected and exposes the example disclaimer', async () => {
-    const user = userEvent.setup()
-    await renderHomepage()
-    await user.click(screen.getByRole('button', { name: 'Change language' }))
-    await user.click(screen.getByRole('menuitem', { name: '简体中文' }))
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-        '让创意，'
+  it.each([false, true])(
+    'offers only the console link when authenticated=%s',
+    async (authenticated) => {
+      const user = userEvent.setup()
+      const router = await renderHomepage(authenticated)
+      const entry = screen.getByRole('button', { name: 'Enter console' })
+      expect(screen.getAllByRole('button')).toHaveLength(1)
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(entry).toHaveAttribute('href', '/dashboard')
+      await user.click(entry)
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe('/dashboard')
       )
-    )
-    await user.click(
-      screen.getByRole('button', { name: '页面上的画面是真实客户案例吗？' })
-    )
+    }
+  )
+  it('uses the Chinese console label without adding other home actions', async () => {
+    await i18next.changeLanguage('zhCN')
+    await renderHomepage()
+    expect(screen.getByRole('button', { name: '进入控制台' })).toBeVisible()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
     expect(
       screen.getByText(
-        '这些是为官网制作的概念视觉，用于表达创作方向，不是客户案例或特定模型的效果承诺。'
+        'Frontend design and development by New API contributors.'
       )
     ).toBeVisible()
+    expect(screen.queryByText(/500W|99\.99%/)).not.toBeInTheDocument()
   })
 })
