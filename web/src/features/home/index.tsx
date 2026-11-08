@@ -16,17 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
-import { Footer } from '@/components/layout/components/footer'
 import { RichContent } from '@/components/rich-content'
 import { useTheme } from '@/context/theme-provider'
+import { GmvupupHome } from '@/features/gmvupup'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { CTA, Features, Hero, HowItWorks, Stats } from './components'
 import { useHomePageContent } from './hooks'
 
 export function Home() {
@@ -36,6 +36,15 @@ export function Home() {
   const { auth } = useAuthStore()
   const isAuthenticated = !!auth.user
   const { content, isLoaded, isUrl } = useHomePageContent()
+  const hash = useRouterState({ select: (state) => state.location.hash })
+
+  // The default sections mount after the custom-home request finishes.
+  useEffect(() => {
+    if (!isLoaded || content || !hash) return
+    document
+      .getElementById(hash.replace(/^#/, ''))
+      ?.scrollIntoView({ block: 'start' })
+  }, [content, hash, isLoaded])
 
   const syncIframePreferences = useCallback(() => {
     try {
@@ -120,14 +129,6 @@ export function Home() {
     )
   }
 
-  return (
-    <PublicLayout showMainContainer={false}>
-      <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
-      <HowItWorks />
-      <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
-    </PublicLayout>
-  )
+  // GMVUPUP customization: retain administrator-configured homepage overrides.
+  return <GmvupupHome isAuthenticated={isAuthenticated} />
 }
