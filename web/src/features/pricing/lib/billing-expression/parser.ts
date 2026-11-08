@@ -346,7 +346,13 @@ class BillingParser {
   }
 }
 
-type ExpressionType = 'number' | 'string' | 'boolean' | 'nil' | 'dynamic'
+type ExpressionType =
+  | 'number'
+  | 'string'
+  | 'boolean'
+  | 'nil'
+  | 'date'
+  | 'dynamic'
 
 function checkExpressionTypes(ast: ExpressionNode): void {
   const types = new Map<ExpressionNode, ExpressionType>()
@@ -398,10 +404,14 @@ function checkExpressionTypes(ast: ExpressionNode): void {
         result = 'number'
       }
     } else if (node.kind === 'call') {
-      if (['param', 'header', 'u', ...TIME_FUNCTIONS].includes(node.name)) {
+      if (
+        node.name !== 'now' &&
+        ['param', 'header', 'u', 'date', ...TIME_FUNCTIONS].includes(node.name)
+      ) {
         requireType(node.args[0], 'string')
       }
-      if (node.name === 'header') result = 'string'
+      if (node.name === 'now' || node.name === 'date') result = 'date'
+      else if (node.name === 'header') result = 'string'
       else if (node.name === 'has') {
         requireType(node.args[1], 'string')
         result = 'boolean'

@@ -39,8 +39,9 @@ export const TIME_FUNCTIONS = [
   'weekday',
   'month',
   'day',
+  'now',
 ] as const
-export type TimeFunction = (typeof TIME_FUNCTIONS)[number]
+export type TimeFunction = Exclude<(typeof TIME_FUNCTIONS)[number], 'now'>
 export const BILLING_FUNCTIONS: Readonly<Record<string, number>> = {
   tier: 2,
   fixed: 1,
@@ -53,6 +54,8 @@ export const BILLING_FUNCTIONS: Readonly<Record<string, number>> = {
   weekday: 1,
   month: 1,
   day: 1,
+  now: 0,
+  date: 1,
   min: 2,
   max: 2,
   abs: 1,

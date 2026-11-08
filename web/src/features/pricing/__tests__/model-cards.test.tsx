@@ -38,6 +38,7 @@ import {
 import { CachedPriceCell } from '../components/cached-price-cell'
 import { ModelCard } from '../components/model-card'
 import { ModelCardGrid } from '../components/model-card-grid'
+import { ModelPriceCell } from '../components/model-price-cell'
 import type { PricingModel } from '../types'
 
 function pricingModel(overrides: Partial<PricingModel> = {}): PricingModel {
@@ -577,7 +578,7 @@ describe('model cards', () => {
     expect(screen.getByText(/480p · 5s ≈/)).toBeVisible()
   })
 
-  it('keeps an unrecognized expression visible with the special billing message', () => {
+  it('keeps an unsupported expression out of the card and leaves details accessible', () => {
     const expression =
       'u("seconds") > 30 ? tier("long", u("seconds") * 0.3) : tier("short", u("seconds") * 0.4)'
     render(
@@ -590,8 +591,9 @@ describe('model cards', () => {
         onClick={vi.fn()}
       />
     )
-    expect(screen.getByText('Special billing expression')).toBeVisible()
-    expect(screen.getByText(expression)).toBeVisible()
+    expect(screen.queryByText(expression)).not.toBeInTheDocument()
+    expect(screen.getByText('View details')).toBeVisible()
+    expect(screen.getByRole('button', { name: /Details/ })).toBeEnabled()
   })
 
   it('keeps browsing and missing metric values available after the metrics request fails', async () => {
@@ -841,3 +843,23 @@ describe('model cards', () => {
     vi.useRealTimers()
   })
 })
+
+for (const endpoint of ['image-generation', 'image-edits']) {
+  it(`shows fixed ${endpoint} prices per image in cards and table cells`, () => {
+    const model = pricingModel({
+      quota_type: 1,
+      model_price: 0.02,
+      supported_endpoint_types: [endpoint],
+    })
+    render(
+      <>
+        <ModelCard model={model} onClick={vi.fn()} />
+        <ModelPriceCell model={model} />
+      </>
+    )
+    expect(screen.getByText('/ image')).toBeVisible()
+    expect(screen.getByText('USD / image')).toBeVisible()
+    expect(screen.getAllByText('Per image')).toHaveLength(2)
+    expect(screen.queryByText('/ request')).not.toBeInTheDocument()
+  })
+}

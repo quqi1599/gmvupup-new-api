@@ -251,7 +251,15 @@ export function isTimeCondition(node: ExpressionNode): boolean {
       (TIME_FUNCTIONS as readonly string[]).includes(name)
     ) &&
     [...dependencies.functions].every((name) =>
-      [...TIME_FUNCTIONS, 'min', 'max', 'abs', 'ceil', 'floor'].includes(name)
+      [
+        ...TIME_FUNCTIONS,
+        'date',
+        'min',
+        'max',
+        'abs',
+        'ceil',
+        'floor',
+      ].includes(name)
     )
   )
 }

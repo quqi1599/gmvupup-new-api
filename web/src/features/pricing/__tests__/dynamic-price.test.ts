@@ -21,6 +21,7 @@ import assert from 'node:assert/strict'
 import { describe, expect, test } from 'vitest'
 
 import { parseTiersFromExpr } from '../lib/billing-expr'
+import { evaluateBillingExpression } from '../lib/billing-expression/runtime'
 import { getBillingModeLabelKey } from '../lib/billing-mode'
 import {
   getCardExamplePrice,
@@ -797,4 +798,49 @@ describe('shared plugin price summaries', () => {
       formatted: '$3',
     })
   })
+})
+
+const calendarExpression =
+  'weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") <= 5 && ((hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12) || (hour("Asia/Shanghai") >= 14 && hour("Asia/Shanghai") < 18)) && !((now() >= date("2026-01-01T00:00:00+08:00") && now() < date("2026-01-04T00:00:00+08:00")) || (now() >= date("2026-02-15T00:00:00+08:00") && now() < date("2026-02-24T00:00:00+08:00")) || (now() >= date("2026-04-04T00:00:00+08:00") && now() < date("2026-04-07T00:00:00+08:00")) || (now() >= date("2026-05-01T00:00:00+08:00") && now() < date("2026-05-06T00:00:00+08:00")) || (now() >= date("2026-06-19T00:00:00+08:00") && now() < date("2026-06-22T00:00:00+08:00")) || (now() >= date("2026-09-25T00:00:00+08:00") && now() < date("2026-09-28T00:00:00+08:00")) || (now() >= date("2026-10-01T00:00:00+08:00") && now() < date("2026-10-08T00:00:00+08:00")) || (now() >= date("2027-01-01T00:00:00+08:00") && now() < date("2027-01-04T00:00:00+08:00")) || (now() >= date("2027-02-05T00:00:00+08:00") && now() < date("2027-02-14T00:00:00+08:00")) || (now() >= date("2027-04-03T00:00:00+08:00") && now() < date("2027-04-06T00:00:00+08:00")) || (now() >= date("2027-05-01T00:00:00+08:00") && now() < date("2027-05-06T00:00:00+08:00")) || (now() >= date("2027-06-09T00:00:00+08:00") && now() < date("2027-06-10T00:00:00+08:00")) || (now() >= date("2027-09-15T00:00:00+08:00") && now() < date("2027-09-16T00:00:00+08:00")) || (now() >= date("2027-10-01T00:00:00+08:00") && now() < date("2027-10-08T00:00:00+08:00"))) ? tier("peak", p * 0.1643835616438356 + cr * 0.0032876712328767125 + c * 0.6575342465753424) : tier("off_peak", p * 0.0821917808219178 + cr * 0.0016438356164383563 + c * 0.3287671232876712)'
+
+describe('calendar-aware token prices', () => {
+  test.each([
+    ['2026-11-09T09:00:00+08:00', 'peak', 0.1643835616438356],
+    ['2026-11-09T12:00:00+08:00', 'off_peak', 0.0821917808219178],
+    ['2026-11-08T10:00:00+08:00', 'off_peak', 0.0821917808219178],
+    ['2027-02-08T10:00:00+08:00', 'off_peak', 0.0821917808219178],
+    ['2027-10-07T15:00:00+08:00', 'off_peak', 0.0821917808219178],
+    ['2027-10-08T09:00:00+08:00', 'peak', 0.1643835616438356],
+  ])(
+    'shows the correct calendar tier at %s instead of an expression',
+    (now, tier, input) => {
+      const summary = getDynamicPricingSummary(
+        pricingModel({
+          billing_mode: 'tiered_expr',
+          billing_expr: calendarExpression,
+        }),
+        { tokenUnit: 'M', now: new Date(now) }
+      )
+      expect(summary?.isSpecialExpression).toBe(false)
+      expect(summary?.isTimePricing).toBe(true)
+      expect(summary?.tier?.label).toBe(tier)
+      expect(summary?.primaryEntries[0].value).toBeCloseTo(input, 12)
+      expect(
+        summary?.secondaryEntries.find(
+          (entry) => entry.field === 'cacheReadPrice'
+        )?.value
+      ).toBeCloseTo(input / 50, 12)
+    }
+  )
+
+  test.each(['2027-02-30T00:00:00+08:00', '2027-01-01', '2027-01-01T00:00:00'])(
+    'does not guess an invalid or timezone-free calendar date %s',
+    (date) => {
+      const result = evaluateBillingExpression(
+        `now() >= date("${date}") ? tier("peak", p * 2) : tier("off_peak", p * 1)`,
+        { tokens: { p: 1 }, now: new Date('2027-01-01T00:00:00+08:00') }
+      )
+      expect(result.status).toBe('unsupported')
+    }
+  )
 })

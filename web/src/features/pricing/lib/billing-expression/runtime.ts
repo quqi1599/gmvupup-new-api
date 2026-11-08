@@ -347,6 +347,41 @@ class BillingRuntime {
     const right = this.evaluate(node.right)
     const a = left.value
     const b = right.value
+    if (a instanceof Date || b instanceof Date) {
+      if (!(a instanceof Date) || !(b instanceof Date)) {
+        throw new BillingExpressionError({
+          code: 'type',
+          detail: 'date comparison',
+        })
+      }
+      const start = a.getTime()
+      const end = b.getTime()
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        throw new BillingExpressionError({
+          code: 'type',
+          detail: 'date comparison',
+        })
+      }
+      switch (node.operator) {
+        case '==':
+          return { value: start === end }
+        case '!=':
+          return { value: start !== end }
+        case '<':
+          return { value: start < end }
+        case '<=':
+          return { value: start <= end }
+        case '>':
+          return { value: start > end }
+        case '>=':
+          return { value: start >= end }
+        default:
+          throw new BillingExpressionError({
+            code: 'unsupported',
+            detail: 'date arithmetic',
+          })
+      }
+    }
     if (node.operator === '==' || node.operator === '!=') {
       if (
         a !== null &&
@@ -422,6 +457,35 @@ class BillingRuntime {
   private call(node: Extract<ExpressionNode, { kind: 'call' }>): RuntimeValue {
     const args = node.args
     switch (node.name) {
+      case 'now':
+        return { value: this.now }
+      case 'date': {
+        const source = this.string(args[0])
+        // Only explicit RFC3339 instants: do not guess a server timezone,
+        // Go date layout, or sub-millisecond comparison in the browser.
+        if (
+          !/^[1-9]\d{3}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(
+            source
+          )
+        ) {
+          throw new BillingExpressionError({
+            code: 'unsupported',
+            detail: 'date format',
+          })
+        }
+        const value = new Date(source)
+        const calendarDate = new Date(`${source.slice(0, 10)}T00:00:00Z`)
+        if (
+          !Number.isFinite(value.getTime()) ||
+          calendarDate.toISOString().slice(0, 10) !== source.slice(0, 10)
+        ) {
+          throw new BillingExpressionError({
+            code: 'unsupported',
+            detail: 'invalid date',
+          })
+        }
+        return { value }
+      }
       case 'fixed': {
         const amount = this.numeric(args[0]).value
         this.billingUnit = 'request'

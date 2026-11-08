@@ -107,3 +107,16 @@ export function replaceModelInPath(path: string, modelName: string): string {
 export function isTokenBasedModel(model: PricingModel): boolean {
   return model.quota_type === QUOTA_TYPE_VALUES.TOKEN
 }
+
+/** The image relay multiplies a fixed image unit price by the generated count. */
+export function getFixedPriceUnit(model: PricingModel): 'image' | 'request' {
+  if (
+    model.quota_type === QUOTA_TYPE_VALUES.REQUEST &&
+    model.supported_endpoint_types?.some(
+      (type) => type === 'image-generation' || type === 'image-edits'
+    )
+  ) {
+    return 'image'
+  }
+  return 'request'
+}
