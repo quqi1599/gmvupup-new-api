@@ -4,15 +4,20 @@ GMVUPUP / gmvupup.top 的独立 New API 前端工作目录。官方基线为 `v1
 
 GitHub 账号已有官方同源 fork `quqi1599/new-api`；`gh repo fork --fork-name gmvupup-new-api` 返回已有 fork。因此本工作目录以 `origin` 指向现有 fork、`upstream` 指向 `QuantumNous/new-api`，与其他 New API 本地目录分开。GMVUPUP 使用独立发布分支 `codex/gmvupup-release`，通过 `.github/workflows/gmvupup-production.yml` 在既有 `ci-vps` runner 检查、构建并发布 `ghcr.io/quqi1599/gmvupup-new-api:sha-<commit前12位>`。生产按 digest 部署；不更新贵数旧站的 main 分支或镜像。
 
-## 页面
+## 2026-11-09 首页与控制台简化（当前本地版）
 
-- 官网入口仍是 `/`，默认首页呈现 GMVUPUP 品牌设计；保留 New API 原有的管理员自定义首页功能。
-- 暖白、炭黑、荧光绿的品牌配色，双向上箭头标识、概念视觉、六模型 Logo、三种创作场景、API 代码示例、FAQ 和移动导航。
-- 模型展示按用户指定保留完整名称：GPT-image-2.6、nanobanana-2.1、seedance-2.5、MiniMax-H3、Gemini-3.8、DeepSeek-V4.1-flash。通过既有 getLobeIcon 复用 @lobehub/icons 的 OpenAI、NanoBanana、ByteDance、Minimax、Gemini、DeepSeek 标识；Seedance 使用其提供方 ByteDance 标识。展示名称不会创建模型、渠道或价格。
-- 注册、登录、模型价格、密钥管理和控制台均使用 New API 真实路由；不修改认证、渠道、计费或任务处理。
-- 新增文案使用 i18next，提供中文和英文；其余界面的新增文案采用英文回退，保留原有译文。
-- 页面概念图不宣称来自 GMVUPUP 线上服务，不使用未经证实的客户数量、可用率、销量或模型效果。
-- 保留 New API 项目链接、前端作者署名、源码许可证和第三方声明。
+本轮基于已发布的 `54e8cd7a`，分支 `codex/gmvupup-simple-console`。发布时合并至 `codex/gmvupup-release`，由既有自建 CI 测试、构建固定版本镜像后部署。
+
+- 按用户提供的「GmvUpUp-开发源码.zip」采用红黑白首页，保留模型品牌视觉，只有一个可点击入口「进入控制台」。去掉演示弹窗、模型点击、语言按钮、文档按钮与未经核实的调用量/可用率数据。
+- 复用现有登录检查，登录后默认 `/dashboard/overview` 显示本站实时模型列表；未登录进入原登录页。
+- 客户控制台参考所附 Grsai 截图：左侧固定一级导航，顶部余额与账号，深色说明区，模型筛选/搜索，三列价格卡片；手机改为单列卡片与侧栏抽屉。
+- 卡片直接显示模型名、用途一句话与价格。图片按张，视频按每个已配置分辨率逐项列出秒价；文字模型显示当前时段的输入/输出/缓存费用。复用本站价格、汇率、分组和表达式显示函数，不写死参考站价格，不修改渠道或账本。
+- 公告、个人资料、数据看板、模型列表、使用日志、充值、订单、任务日志、密钥、文档等均为直接入口。订单复用原账单组件的页内展示；保留管理员原有工作区和权限。
+- 模型 ID 支持复制；正常卡片无需打开详情页才能看价格。特殊条件价格使用既有详情抽屉，避免猜测价格。
+- 公开目录当前读取两个图片模型和 DeepSeek；视频卡片使用配置驱动，开通后自动出现。测试视频价格只用于本地 fixture，不对外宣称已经可调用。
+- 界面提供中英文，其他语言回退英文。保留 New API 署名、许可证与项目来源。
+
+源码：`web/src/features/gmvupup/`、`web/src/features/gmvupup-console/`；样式：`gmvupup-landing.css`、`gmvupup-console.css`。验证与截图在工作区 `outputs/gmvupup-console-20261109/`。
 
 ## API 文档
 
@@ -23,33 +28,31 @@ GitHub 账号已有官方同源 fork `quqi1599/new-api`；`gh repo fork --fork-n
 - 公开模型目录复用 `/api/pricing`；令牌自己的可用范围通过 `GET /v1/models` 查询。代码示例使用本站 ID `gpt-image-2.6`、`nanobanana-2.1`、`deepseek-v4.1-flash`，不直接使用上游别名。
 - 图像说明采用本站同步接口。视频页明确要求先开通对应模型；示例为已有 Doubao 适配器的 `doubao-seedance-2.5`，不是 CCG 插件协议，不宣称当前已可调用。
 - `/gmvupup/docs/openapi.json` 提供 OpenAPI 3.1 文件，覆盖模型列表、图像生成/编辑和对话；`/gmvupup/docs/guide.md` 提供中文接入指南。
-- 首页导航与页脚的 API 文档入口均指向 `/docs`；修复文档返回首页锚点时，首页异步加载后没有滚动到对应段落的问题。
+- 控制台文档入口指向 `/docs`；文档页导航使用实际控制台和文档路由。
 
 源码：`web/src/features/gmvupup-docs/`、`web/src/routes/docs/`、`web/src/styles/gmvupup-docs.css`。验证与截图：工作区 `outputs/gmvupup-docs/`，报告 `outputs/GMVUPUP-文档验收.md`。
 
 ## 本机预览
 
-在 `web/` 执行 `bun install --frozen-lockfile`，然后用两个终端运行：
+依赖与构建在验证目录 `/Users/qinxian/.codex/worktrees/gmvupup-validation-20261108/web` 中执行。当前任务在本机 `http://127.0.0.1:4200/` 和 `/dashboard/overview` 提供预览。
+
+独立终端启动工作区 `outputs/gmvupup-console-20261109/preview-api.mjs`，然后在 `web/` 运行：
 
 ```sh
-node scripts/gmvupup-preview-api.mjs
+VITE_REACT_APP_SERVER_URL=http://127.0.0.1:4201 bun run dev --host 127.0.0.1 --port 4200
 ```
 
-```sh
-VITE_REACT_APP_SERVER_URL=http://127.0.0.1:4181 bun run dev --host 127.0.0.1 --port 4180
-```
-
-打开 http://127.0.0.1:4180/ 或 http://127.0.0.1:4180/docs 。预览 API 仅监听回环地址，返回只读样例数据，拒绝写请求，不连接生产或上游。预览的价格目录为空；账号和推理操作须在真正的 New API 环境验证。部署时正常使用 New API 后端，不使用该预览 API。
-
-官网内容位于 `web/src/features/gmvupup/`，独立样式位于 `web/src/styles/gmvupup.css`。保留原 `features/home` 的自定义内容加载路径，仅替换默认内容分支。
+预览服务仅监听回环地址；价格来自本轮公开目录快照，账户与余额为本机测试数据；仅模拟刷新测试会话，其他写请求全部拒绝，不连接生产或上游。生产由现有 New API 后端提供真实认证与数据。
 
 ## 组件复用
 
-交互使用仓库已有 Button、Tabs、Accordion、Sheet、CopyButton 和 LanguageSwitcher。公共 PublicHeader 的现有实现未实际使用其声明的 navContent/rightContent 插槽，导航由后台配置覆盖，且没有页面内锚点的独立布局；本次只为官网组合品牌导航，不改动其他页面。Footer 的系统名称与 Logo 优先于外部 props，无法在不改变后台配置的情况下固定独立品牌；官网使用独立语义化页脚，同时保留可见的原项目归属和动态法律页面开关。
+客户控制台组合仓库的 Sidebar、NavGroup、ProfileDropdown、LanguageSwitcher，继续使用 useSidebarConfig 的管理员/用户菜单开关。原 AppSidebar 采用进入子工作区后切换目录的方式，不能提供本轮要求的客户固定一级导航；管理员页继续沿用它。原 AppHeader 将系统品牌和版本固定在全宽顶部，新增客户页组合把品牌置于左栏，并保留共享账号控件。
+
+模型卡片组合 Card、CopyButton、原有价格格式化/分组/时间表达式/任务价格展示函数。原 ModelCard 固定展示接口、分组、性能与详情入口，且任务价格为范围摘要；本轮需要常驻的逐分辨率价格格和一句说明，因此新增配置驱动的展示组件，不另写计费计算。BillingHistoryDialog 新增兼容的 inline 展示，订单页复用原查询、复制和确认行为。
 
 ## 视觉资产
 
-`web/public/gmvupup/creative-sneaker.webp`（233,616 bytes）由内置 imagegen 生成，再仅作 WebP 编码优化。原图保存在工作区 `outputs/gmvupup-creative-sneaker-original.png`。这是网站概念视觉，不是 CCG/Seedance 的实测输出。
+`web/public/gmvupup/creative-sneaker.webp`（233,616 bytes）由内置 imagegen 生成，再仅作 WebP 编码优化。原图保存在工作区 `outputs/gmvupup-creative-sneaker-original.png`。这是前一版网站概念视觉，新首页不再使用；不是 CCG/Seedance 的实测输出。
 
 生成提示词：高端广告产品摄影；无品牌的淡紫色运动鞋，荧光绿细节和半透明鞋底，斜向悬浮于淡紫色沙丘上；后方浅荧光绿圆盘与飘动的淡紫色绸缎；柔和、有方向的棚拍光，材质清晰；不添加 Logo、文字、水印、边框或 UI。
 
@@ -59,11 +62,11 @@ VITE_REACT_APP_SERVER_URL=http://127.0.0.1:4181 bun run dev --host 127.0.0.1 --p
 cd web
 bun run typecheck
 bunx --no-install oxlint -c .oxlintrc.json src/features/gmvupup src/features/gmvupup-docs src/routes/docs src/features/home/index.tsx scripts/gmvupup-preview-api.mjs
-bunx --no-install vitest run src/features/gmvupup/__tests__/homepage.test.tsx src/features/gmvupup-docs/__tests__/documentation.test.tsx
+bunx --no-install vitest run src/features/gmvupup/__tests__/homepage.test.tsx src/features/gmvupup-console/__tests__ src/features/gmvupup-docs/__tests__/documentation.test.tsx
 bun run build
 ```
 
-验证结果见工作区 `outputs/GMVUPUP-验收.md` 和 `outputs/GMVUPUP-文档验收.md`。本次是本地前端开发；服务器版本更新按用户要求走既有自建 CI 测试、构建和固定版本制品部署。本次未提交、推送或部署。
+本轮验证结果见工作区 `outputs/gmvupup-console-20261109/REPORT.md`。本次是本地前端开发；服务器版本更新按用户要求走既有自建 CI 测试、构建和固定版本制品部署。本次未提交、推送或部署。
 
 ## 验证目录
 

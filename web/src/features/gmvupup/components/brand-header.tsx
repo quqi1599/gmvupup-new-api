@@ -47,17 +47,25 @@ export function BrandHeader(props: { isAuthenticated: boolean }) {
 
   const navigation = (
     <>
-      <Link to='/' hash='possibilities' onClick={() => setOpen(false)}>
-        {t('Creative possibilities')}
+      <Link to='/dashboard' onClick={() => setOpen(false)}>
+        {t('Console')}
       </Link>
-      <Link to='/pricing' onClick={() => setOpen(false)}>
+      <Link
+        to='/dashboard/$section'
+        params={{ section: 'overview' }}
+        onClick={() => setOpen(false)}
+      >
         {t('Models & pricing')}
       </Link>
       <Link to='/docs' onClick={() => setOpen(false)}>
         {t('API documentation')}
       </Link>
-      <Link to='/' hash='questions' onClick={() => setOpen(false)}>
-        {t('Common questions')}
+      <Link
+        to='/docs/$topic'
+        params={{ topic: 'errors' }}
+        onClick={() => setOpen(false)}
+      >
+        {t('Errors & retries')}
       </Link>
     </>
   )
