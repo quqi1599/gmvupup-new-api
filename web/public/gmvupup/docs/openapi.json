@@ -1,0 +1,209 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GMVUPUP API",
+    "version": "1.0.0",
+    "description": "Core OpenAI-compatible interfaces. Available models and optional parameters depend on your key and model configuration."
+  },
+  "servers": [
+    {
+      "url": "https://gmvupup.top/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/models": {
+      "get": {
+        "operationId": "models",
+        "summary": "Model directory",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/images/generations": {
+      "post": {
+        "operationId": "images",
+        "summary": "Image generation",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model",
+                  "prompt"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "size": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "model": "gpt-image-2.6",
+                "prompt": "A lavender sneaker on pale sand, soft studio lighting.",
+                "n": 1,
+                "size": "1024x1024"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/completions": {
+      "post": {
+        "operationId": "chat",
+        "summary": "Chat completions",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model",
+                  "messages"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "stream": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "example": {
+                "model": "deepseek-v4.1-flash",
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": "Write three short headlines for a new running shoe."
+                  }
+                ],
+                "stream": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/edits": {
+      "post": {
+        "operationId": "image_edits",
+        "summary": "Edit an image",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model",
+                  "image",
+                  "prompt"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "example": "gpt-image-2.6"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer",
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Invalid or missing API key"
+          }
+        }
+      }
+    }
+  }
+}
