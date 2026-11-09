@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from '@tanstack/react-router'
 import {
   ArrowUpRight,
+  Bot,
   Image,
   KeyRound,
   LayoutGrid,
@@ -41,6 +42,7 @@ import {
 } from '@/components/ui/table'
 
 import { API_BASE_URL, DOC_PAGES, type DocTopic } from '../content'
+import { AgentSkills } from './agent-skills'
 import { CodeExamples } from './code-examples'
 import { ModelCatalog } from './model-catalog'
 
@@ -132,6 +134,7 @@ export function DocArticle(props: { topic: DocTopic }) {
           </div>
         )}
       </section>
+      {props.topic === 'agent-skills' && <AgentSkills />}
       {data.examples && (
         <section id='request' className='gmv-doc-section'>
           <div className='gmv-doc-section-title'>
@@ -239,6 +242,12 @@ export function DocArticle(props: { topic: DocTopic }) {
         <section id='next-steps' className='gmv-doc-section'>
           <h2>{t('Choose your next step')}</h2>
           <div className='gmv-doc-next-cards'>
+            <Link to='/docs/$topic' params={{ topic: 'agent-skills' }}>
+              <Bot aria-hidden='true' />
+              <strong>{t('Agent Skills')}</strong>
+              <p>{t('Let your agent create with GMVUPUP.')}</p>
+              <ArrowUpRight aria-hidden='true' />
+            </Link>
             <Link to='/docs/$topic' params={{ topic: 'images' }}>
               <Image aria-hidden='true' />
               <strong>{t('Image generation API')}</strong>

@@ -61,6 +61,9 @@ export function GmvupupDocs(props: { topic: DocTopic }) {
       label: props.topic === 'quick-start' ? 'Connection details' : 'Overview',
     },
   ]
+  if (props.topic === 'agent-skills') {
+    toc.push({ id: 'skill-copy', label: 'Skill copy area' })
+  }
   if (data.examples) toc.push({ id: 'request', label: 'Request example' })
   if (data.fields) {
     toc.push({

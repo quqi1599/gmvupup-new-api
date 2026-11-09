@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   BookOpen,
+  Bot,
   Film,
   Image,
   KeyRound,
@@ -39,6 +40,7 @@ import { DOC_IDS, DOC_PAGES, type DocTopic } from '../content'
 
 const icons = {
   'quick-start': BookOpen,
+  'agent-skills': Bot,
   authentication: KeyRound,
   models: LayoutGrid,
   images: Image,

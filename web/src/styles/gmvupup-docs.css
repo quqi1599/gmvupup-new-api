@@ -993,3 +993,79 @@
     padding-inline: 15px;
   }
 }
+
+/* Agent prompt builder: keeps long prompts inside the reading column. */
+.gmv-skill-editor {
+  border: 1px solid #dce3d3;
+  border-radius: 12px;
+  padding: 20px;
+  background: #fff;
+  min-width: 0;
+}
+.gmv-skill-tabs {
+  width: 100%;
+  height: auto;
+  flex-wrap: wrap;
+}
+.gmv-skill-tabs [role='tab'] {
+  flex: 1;
+  min-height: 40px;
+  white-space: normal;
+}
+.gmv-skill-fields {
+  display: grid;
+  gap: 22px;
+  padding-top: 24px;
+  min-width: 0;
+}
+.gmv-skill-fields label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.gmv-skill-fields textarea {
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  resize: vertical;
+}
+.gmv-skill-fields select {
+  font-size: 14px;
+}
+.gmv-skill-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.gmv-skill-copy-row button {
+  min-height: 44px;
+  background: #243619;
+  color: #fff;
+}
+.gmv-skill-copy-row p,
+.gmv-skill-preview p {
+  color: #606c55;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.gmv-skill-preview summary {
+  cursor: pointer;
+  font-size: 14px;
+  padding-block: 8px;
+}
+.gmv-skill-preview textarea {
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .gmv-skill-editor {
+    padding: 14px;
+  }
+  .gmv-skill-copy-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+}

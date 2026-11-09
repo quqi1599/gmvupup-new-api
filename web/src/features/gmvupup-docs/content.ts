@@ -41,6 +41,7 @@ export type DocPage = {
 }
 export const DOC_IDS = [
   'quick-start',
+  'agent-skills',
   'authentication',
   'models',
   'images',
@@ -67,6 +68,20 @@ export const DOC_PAGES: Record<DocTopic, DocPage> = {
     },
     notes: [
       'Keep API keys on your server or in environment variables. Never include a live key in frontend code or public repositories.',
+    ],
+  },
+  'agent-skills': {
+    title: 'Agent Skills',
+    summary:
+      'Copy a skill into your agent to generate images and videos with GMVUPUP.',
+    group: 'start',
+    keywords:
+      'agent skill prompt 复制 提示词 生图 视频 Seedance Wan GPT Image Nano Banana',
+    body: [
+      'Use an agent with HTTP or terminal tools. Configure GMVUPUP_API_KEY in its environment or secret settings first.',
+    ],
+    notes: [
+      'Only the models returned by GET /v1/models are available to your key. Check live pricing before generation.',
     ],
   },
   authentication: {
