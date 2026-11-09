@@ -630,8 +630,14 @@ func ResponseOpenAI2Claude(openAIResponse *dto.OpenAITextResponse, info *relayco
 		Role:  "assistant",
 		Model: openAIResponse.Model,
 	}
+	request, isClaude := info.Request.(*dto.ClaudeRequest)
+	showThinking := info.ChannelMeta != nil && info.ChannelOtherSettings.CPAAuditIdentityEnabled &&
+		isClaude && request != nil && request.Thinking != nil && request.Thinking.Display == "summarized"
 	for _, choice := range openAIResponse.Choices {
 		stopReason = stopReasonOpenAI2Claude(choice.FinishReason)
+		if reasoning := choice.Message.GetReasoningContent(); showThinking && reasoning != "" {
+			contents = append(contents, dto.ClaudeMediaMessage{Type: "thinking", Thinking: common.GetPointer(reasoning)})
+		}
 		if choice.FinishReason == "tool_calls" || (info.IsResponsesIncomplete() && len(choice.Message.ParseToolCalls()) > 0) {
 			if text := choice.Message.StringContent(); text != "" {
 				contents = append(contents, dto.ClaudeMediaMessage{Type: "text", Text: common.GetPointer(text)})
