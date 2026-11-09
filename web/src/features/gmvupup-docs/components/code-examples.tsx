@@ -61,7 +61,7 @@ export function CodeExamples(props: { examples: Examples; models?: string[] }) {
               className='gmv-doc-code'
               code={
                 props.models
-                  ? source.replaceAll('gpt-image-2.6', model)
+                  ? source.replaceAll(props.models[0], model)
                   : source
               }
               language={language === 'curl' ? 'bash' : language}

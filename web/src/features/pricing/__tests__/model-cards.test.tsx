@@ -863,3 +863,40 @@ for (const endpoint of ['image-generation', 'image-edits']) {
     expect(screen.queryByText('/ request')).not.toBeInTheDocument()
   })
 }
+
+it('lists all resolution prices from a single video plugin in cards and table cells', () => {
+  useSystemConfigStore.getState().setConfig({
+    currency: {
+      ...DEFAULT_CURRENCY_CONFIG,
+      quotaDisplayType: 'CNY',
+      usdExchangeRate: 7.3,
+    },
+  })
+  const model = pricingModel({
+    model_name: 'doubao-seedance-2.5',
+    quota_type: 0,
+    model_ratio: 37.5,
+    supported_endpoint_types: ['openai-video'],
+    billing_plugin_variants: [
+      {
+        plugin_key: 'ccg-seedance',
+        plugin_name: 'CCG Seedance',
+        billing_mode: 'tiered_expr',
+        billing_expr:
+          'u("quality") == "480p" ? tier("480p", u("seconds") * 0.07342465753424658) : u("quality") == "720p" ? tier("720p", u("seconds") * 0.16547945205479452) : tier("1080p", u("seconds") * 0.40986301369863014)',
+        billing_usage_schema: {
+          seconds: { type: 'number', unit: 'second' },
+          quality: { enum: ['480p', '720p', '1080p'] },
+        },
+      },
+    ],
+  })
+  const card = render(<ModelCard model={model} onClick={() => undefined} />)
+  for (const text of ['480p', '720p', '1080p', '¥0.536', '¥1.208', '¥2.992']) {
+    expect(within(card.container).getByText(text)).toBeVisible()
+  }
+  const cell = render(<ModelPriceCell model={model} />)
+  for (const text of ['480p', '720p', '1080p', '¥0.536', '¥1.208', '¥2.992']) {
+    expect(within(cell.container).getByText(text)).toBeVisible()
+  }
+})

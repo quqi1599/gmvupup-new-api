@@ -64,6 +64,9 @@ export function GmvupupDocs(props: { topic: DocTopic }) {
   if (props.topic === 'agent-skills') {
     toc.push({ id: 'skill-copy', label: 'Skill copy area' })
   }
+  if (props.topic === 'videos') {
+    toc.push({ id: 'pricing', label: 'Current video pricing' })
+  }
   if (data.examples) toc.push({ id: 'request', label: 'Request example' })
   if (data.fields) {
     toc.push({

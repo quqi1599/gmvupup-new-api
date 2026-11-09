@@ -34,6 +34,11 @@ import {
 import { formatBillingCondition } from './billing-expression/condition-display'
 import { compileBillingExpression } from './billing-expression/parser'
 import { visitExpression } from './billing-expression/types'
+import {
+  getDynamicPricingSummary,
+  getDynamicPriceEntries,
+  type DynamicPriceOptions,
+} from './dynamic-price'
 import { getTaskPricingDisplayTiers } from './task-matrix-display'
 
 export function taskPriceLabel(
@@ -138,4 +143,54 @@ export function pricingDisplayFallbackKey(
   return missingUsageMetadata
     ? 'Task usage metadata is unavailable. Pricing details cannot be displayed.'
     : 'This expression cannot be expanded into a price table. View the original expression below.'
+}
+
+/** Expand only a bounded, single-provider resolution matrix, never mixed rules. */
+export function getVideoResolutionPrices(
+  model: PricingModel,
+  options: DynamicPriceOptions
+): { resolution: string; price: string }[] | null {
+  const summary = getDynamicPricingSummary(model, options)
+  if (
+    !summary?.isTaskUsage ||
+    summary.providerCount ||
+    summary.hasRequestRules ||
+    summary.isSpecialExpression ||
+    summary.tiers.length < 2 ||
+    summary.tiers.length > 6
+  ) {
+    return null
+  }
+  const rows = []
+  for (const tier of summary.tiers) {
+    if (
+      !('unitPrices' in tier) ||
+      tier.constant !== 0 ||
+      tier.conditionText ||
+      tier.conditions.length !== 1
+    ) {
+      return null
+    }
+    const condition = tier.conditions[0]
+    if (
+      !('field' in condition) ||
+      typeof condition.value !== 'string' ||
+      !['quality', 'resolution'].includes(condition.field) ||
+      !/^(480p|720p|1080p|4k)$/i.test(condition.value)
+    ) {
+      return null
+    }
+    const entries = getDynamicPriceEntries(tier, {
+      ...options,
+      usageSchema:
+        model.billing_plugin_variants?.[0]?.billing_usage_schema ??
+        model.billing_usage_schema,
+    })
+    if (entries.length !== 1 || entries[0].unit !== 'second') return null
+    rows.push({ resolution: condition.value, price: entries[0].formatted })
+  }
+  if (new Set(rows.map((row) => row.resolution)).size !== rows.length) {
+    return null
+  }
+  return rows
 }

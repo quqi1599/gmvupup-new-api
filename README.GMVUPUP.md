@@ -26,8 +26,8 @@ GitHub 账号已有官方同源 fork `quqi1599/new-api`；`gh repo fork --fork-n
 - 8 篇内容：快速开始、身份验证、模型目录、图像生成、图像编辑、对话生成、视频任务、错误与重试。
 - 文档搜索、Enter 打开结果、页内导航、上下篇、Base URL 复制、cURL/Python/JavaScript 切换、示例模型切换、代码复制和下载。
 - 公开模型目录复用 `/api/pricing`；令牌自己的可用范围通过 `GET /v1/models` 查询。代码示例使用本站 ID `gpt-image-2.6`、`nanobanana-2.1`、`deepseek-v4.1-flash`，不直接使用上游别名。
-- 图像说明采用本站同步接口。视频页明确要求先开通对应模型；示例为已有 Doubao 适配器的 `doubao-seedance-2.5`，不是 CCG 插件协议，不宣称当前已可调用。
-- `/gmvupup/docs/openapi.json` 提供 OpenAPI 3.1 文件，覆盖模型列表、图像生成/编辑和对话；`/gmvupup/docs/guide.md` 提供中文接入指南。
+- 图像说明采用本站同步接口。视频页使用当前 CCG Seedance 插件协议，支持 `doubao-seedance-2.5`、`doubao-seedance-2.0`，必填 `userPrompt/duration/quality/aspectRatio`；实时秒价读取本站目录，下载指南保存带日期的价格快照。
+- `/gmvupup/docs/openapi.json` 提供 OpenAPI 3.0.3 文件，覆盖模型列表、图像生成/编辑、对话，以及视频创建、查询、视频/尾帧下载；`/gmvupup/docs/guide.md` 提供中文接入指南。
 - 控制台文档入口指向 `/docs`；文档页导航使用实际控制台和文档路由。
 
 源码：`web/src/features/gmvupup-docs/`、`web/src/routes/docs/`、`web/src/styles/gmvupup-docs.css`。验证与截图：工作区 `outputs/gmvupup-docs/`，报告 `outputs/GMVUPUP-文档验收.md`。
@@ -78,3 +78,9 @@ bun run build
 Use case: ads-marketing. Asset type: hero concept photograph for GMVUPUP, a premium AI creative API website. Create a single striking high-end advertising still life, square 1024 by 1024 composition. A sculptural unbranded lavender and pale lilac running sneaker with vivid acid-lime accents, translucent lime wavy sole and beautifully detailed mesh, floating diagonally from lower left to upper right above undulating pale lavender sand dunes. Behind the shoe is a very large luminous pale lime circular studio disc, mostly cropped, with hazy lavender atmospheric background. A small ripple of lilac satin flows behind the heel, suggesting subtle movement. Make the sneaker the unmistakable main subject occupying 65 percent of the image, beautifully lit editorial product photography with strong directional shadows and tactile materials, sophisticated surreal commercial art direction. Colors limited to lavender, pale orchid, acid lime, and warm white. No logos, no words, no text, no watermark, no interface, no border. It must feel like an expensive sportswear campaign, not a generic 3D illustration.
 
 </details>
+
+## 2026-11-09 Seedance 价格与文档完善（本机待发布）
+
+在 `codex/seedance-pricing-docs-20261109` 分支完善公开卡片和列表的逐分辨率秒价，复用现有表达式解析、币种与分组计算。仅由 CCG 插件提供的两款 Seedance 在前台展示视频入口和匹配的 JSON 示例；原始后台价格与渠道不变。视频文档新增实时价格、两模型示例切换、参考素材限制、轮询和尾帧下载说明，同步更新 OpenAPI 和中文下载指南。
+
+代码位于独立 worktree `/Users/qinxian/.codex/worktrees/gmvupup-seedance-docs-20261109`，避免覆盖其他任务的发布目录。验收材料在 SeeDance 工作区 `outputs/seedance-docs-20261109/`。本轮尚未提交、推送或部署；发布仍使用 `.github/workflows/gmvupup-production.yml` 和 ci-vps 固定镜像流程。
