@@ -11,8 +11,10 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
@@ -528,4 +530,60 @@ func TestSetupLoginDoesNotTouchPasswordWhenPasswordFieldOmitted(t *testing.T) {
 	var stored model.User
 	require.NoError(t, db.First(&stored, user.Id).Error)
 	assert.Equal(t, hashedPassword, stored.Password)
+}
+
+func TestListModelsIncludesCompatiblePluginOverrideAndKeepsTokenLimits(t *testing.T) {
+	withSelfUseModeDisabled(t)
+	withTieredBillingConfig(t, map[string]string{}, map[string]string{})
+	db := setupModelListControllerTestDB(t)
+	names := []string{"zz-plugin-priced", "zz-plugin-free", "zz-plugin-empty", "zz-plugin-incompatible", "zz-plugin-stale", "zz-plugin-other-group"}
+	source := `export const meta={apiVersion:1,key:"list-priced",name:"List priced",version:"1.0.0",author:{name:"Test"},models:["zz-plugin-priced","zz-plugin-free","zz-plugin-empty","zz-plugin-incompatible","zz-plugin-other-group"],fetchMode:"per_task",usageSchema:{seconds:{type:"number",unit:"second"}}};
+ export function buildSubmitRequest(){return {};}
+ export function parseSubmitResponse(){return {};}
+ export function buildQueryRequest(){return {};}
+ export function parseTaskResult(){return {};}`
+	_, err := jsplugin.DefaultRegistry.Register(source, jsplugin.Options{})
+	require.NoError(t, err)
+	t.Cleanup(func() { jsplugin.DefaultRegistry.Unregister("list-priced") })
+	overrides := map[string]string{}
+	for _, name := range names {
+		overrides[billing_setting.PluginBillingExprKey("list-priced", name)] = `tier("base",u("seconds") * 0.1)`
+	}
+	overrides["list-priced::zz-plugin-free"] = `tier("free",u("seconds") * 0)`
+	overrides["list-priced::zz-plugin-empty"] = " "
+	overrides["list-priced::zz-plugin-incompatible"] = `tier("wrong",u("credits") * 0.1)`
+	raw, err := common.Marshal(overrides)
+	require.NoError(t, err)
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{billing_setting.PluginBillingExprOption: string(raw)}))
+	require.NoError(t, db.Create(&model.User{Id: 1001, Username: "plugin-list-user", Password: "password", Group: "default", Status: common.UserStatusEnabled}).Error)
+	for _, name := range names {
+		group := "default"
+		if name == "zz-plugin-other-group" {
+			group = "vip"
+		}
+		require.NoError(t, db.Create(&model.Ability{Group: group, Model: name, ChannelId: 1, Enabled: true}).Error)
+	}
+	for _, limited := range []bool{false, true} {
+		t.Run(fmt.Sprint("limited=", limited), func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+			ctx.Set("id", 1001)
+			if limited {
+				ctx.Set(string(constant.ContextKeyTokenModelLimitEnabled), true)
+				ctx.Set(string(constant.ContextKeyTokenModelLimit), map[string]bool{"zz-plugin-priced": true})
+			}
+			ListModels(ctx, constant.ChannelTypeOpenAI)
+			ids := decodeListModelsResponse(t, recorder)
+			assert.Contains(t, ids, "zz-plugin-priced")
+			if limited {
+				assert.NotContains(t, ids, "zz-plugin-free")
+			} else {
+				assert.Contains(t, ids, "zz-plugin-free")
+			}
+			for _, name := range names[2:] {
+				assert.NotContains(t, ids, name)
+			}
+		})
+	}
 }
