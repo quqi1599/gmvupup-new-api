@@ -55,7 +55,6 @@ export default defineConfig(({ envMode }) => {
     source: {
       entry: {
         index: './src/main.tsx',
-        'gmv-universe': './experiences/gmv-universe/main.js',
       },
     },
     resolve: {
@@ -64,10 +63,7 @@ export default defineConfig(({ envMode }) => {
       },
     },
     html: {
-      template: ({ entryName }) =>
-        entryName === 'gmv-universe'
-          ? './experiences/gmv-universe/index.html'
-          : './index.html',
+      template: './index.html',
       favicon: './public/favicon.ico',
     },
     server: {

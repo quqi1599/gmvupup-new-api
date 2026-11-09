@@ -23,7 +23,7 @@ import Minimax from '@lobehub/icons/es/Minimax/components/Color'
 import NanoBanana from '@lobehub/icons/es/NanoBanana/components/Color'
 import OpenAI from '@lobehub/icons/es/OpenAI/components/Mono'
 import { Link } from '@tanstack/react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Image, Video, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -31,7 +31,6 @@ import { Button } from '@/components/ui/button'
 import { GmvupupWordmark } from './components/wordmark'
 
 import '@/styles/gmvupup-landing.css'
-import '@/styles/gmvupup-universe.css'
 
 const models = [
   { name: 'GPT Image', icon: OpenAI, category: 'Product images' },
@@ -49,7 +48,7 @@ const models = [
 export function GmvupupHome(_props: { isAuthenticated: boolean }) {
   const { t } = useTranslation()
   return (
-    <div className='gmv-universe-home'>
+    <div className='gmv-landing'>
       <title>{t('GMVUPUP · AI for ecommerce | New API')}</title>
       <meta
         name='description'
@@ -57,41 +56,84 @@ export function GmvupupHome(_props: { isAuthenticated: boolean }) {
           'Product images, creative videos and copywriting. Find models and clear pricing in one console.'
         )}
       />
-      <header className='gmv-universe-header'>
+      <header className='gmv-landing-header'>
         <GmvupupWordmark />
-        <div
-          className='gmv-universe-models'
+        <span>API</span>
+        <p>{t('Built for ecommerce')}</p>
+      </header>
+      <main className='gmv-landing-main'>
+        <section className='gmv-landing-copy'>
+          <p className='gmv-landing-eyebrow'>
+            <span />
+            {t('AI for your next idea')}
+          </p>
+          <h1>
+            Gmv<span>UpUp</span> <small>API</small>
+          </h1>
+          <h2>
+            {t('Built for ecommerce.')}
+            <br />
+            {t('AI models, all in one place.')}
+          </h2>
+          <p className='gmv-landing-description'>
+            {t(
+              'From product images to campaign ideas. Find the right model and see the price before you start.'
+            )}
+          </p>
+          <Button className='gmv-landing-cta' render={<Link to='/dashboard' />}>
+            {t('Enter console')}
+            <ArrowUpRight aria-hidden='true' />
+          </Button>
+          <p className='gmv-landing-hint'>
+            {t('Models, prices and API keys in one console.')}
+          </p>
+          <div className='gmv-landing-capabilities'>
+            <span>
+              <Image />
+              {t('Product images')}
+            </span>
+            <span>
+              <Video />
+              {t('Creative videos')}
+            </span>
+            <span>
+              <MessageSquare />
+              {t('Copywriting & reasoning')}
+            </span>
+          </div>
+        </section>
+        <section
+          className='gmv-landing-visual'
           aria-label={t('AI model families')}
         >
-          {models.map((model) => (
-            <span
-              key={model.name}
-              role='img'
-              aria-label={model.name}
-              title={model.name}
-            >
-              <model.icon size={22} aria-hidden='true' />
-            </span>
-          ))}
-        </div>
-        <Button
-          className='gmv-universe-console'
-          render={<Link to='/dashboard' />}
-        >
-          {t('Enter console')}
-          <ArrowUpRight aria-hidden='true' />
-        </Button>
-      </header>
-      <main className='gmv-universe-stage'>
-        <h1 className='sr-only'>GmvUpUp — {t('Built for ecommerce')}</h1>
-        <iframe
-          title={t('GMV ecommerce universe')}
-          src='/gmv-universe.html?embedded=1'
-          sandbox='allow-scripts allow-downloads'
-          className='gmv-universe-frame'
-        />
+          <p>ONE API. MORE POSSIBILITIES.</p>
+          <div className='gmv-landing-models'>
+            <div className='gmv-landing-orbit' aria-hidden='true' />
+            <div className='gmv-landing-center' aria-hidden='true'>
+              Up<span>Up</span>
+              <small>CREATE · GROW · REPEAT</small>
+            </div>
+            {models.map((model, index) => (
+              <div
+                className={`gmv-landing-model gmv-landing-model-${index}`}
+                key={model.name}
+              >
+                <span>
+                  <model.icon size={30} />
+                </span>
+                <div>
+                  <strong>{model.name}</strong>
+                  <small>{t(model.category)}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+          <small>
+            {t('Available models and prices are listed in the console.')}
+          </small>
+        </section>
       </main>
-      <footer className='gmv-universe-credit'>
+      <footer className='gmv-landing-footer'>
         <span>GmvUpUp · {t('Built for ecommerce')}</span>
         <span>Frontend design and development by New API contributors.</span>
       </footer>
