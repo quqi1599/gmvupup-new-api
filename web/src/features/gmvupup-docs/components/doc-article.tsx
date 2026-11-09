@@ -43,6 +43,7 @@ import {
 import { API_BASE_URL, DOC_PAGES, type DocTopic } from '../content'
 import { CodeExamples } from './code-examples'
 import { ModelCatalog } from './model-catalog'
+import { VideoPricing } from './video-pricing'
 
 export function DocArticle(props: { topic: DocTopic }) {
   const { t } = useTranslation()
@@ -132,6 +133,7 @@ export function DocArticle(props: { topic: DocTopic }) {
           </div>
         )}
       </section>
+      {props.topic === 'videos' && <VideoPricing />}
       {data.examples && (
         <section id='request' className='gmv-doc-section'>
           <div className='gmv-doc-section-title'>

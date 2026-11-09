@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { API_EXAMPLES, SEEDANCE_MODELS } from '@/features/gmvupup/api-examples'
+
 export type CodeExamples = Record<'curl' | 'python' | 'javascript', string>
 export type DocField = {
   name: string
@@ -285,47 +287,95 @@ export const DOC_PAGES: Record<DocTopic, DocPage> = {
   videos: {
     title: 'Video tasks',
     summary:
-      'Create a task, follow its status and retrieve the finished video.',
+      'Generate videos with Seedance 2.5 or 2.0, then poll and download the result.',
     group: 'reference',
-    keywords: 'video seedance-2.5 视频 异步 任务 轮询',
+    keywords: 'video seedance 2.5 2.0 视频 异步 任务 价格 轮询',
     method: 'POST',
     endpoint: '/v1/videos',
-    conditional: 'Requires an enabled video model',
+    models: SEEDANCE_MODELS,
     body: [
-      'This example describes the Seedance video interface. Confirm that the model and task interface are enabled for your account before calling it.',
+      'Use the JSON fields below for both Seedance models. Send requests with your GMVUPUP API key; the provider key is managed by the server.',
+      'Seedance uses userPrompt, duration, quality and aspectRatio. The prompt, seconds and size fields and multipart uploads are not accepted.',
     ],
-    examples: {
-      curl: 'curl "https://gmvupup.top/v1/videos" \\\n  -H "Authorization: Bearer $GMVUPUP_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  --max-time 240 \\\n  -d \'{\n  "model": "doubao-seedance-2.5",\n  "prompt": "A sneaker floating above lilac dunes, slow camera movement.",\n  "seconds": 5,\n  "size": "1280x720"\n}\'',
-      python:
-        'import os\nimport requests\n\nresponse = requests.post(\n    "https://gmvupup.top/v1/videos",\n    headers={"Authorization": "Bearer " + os.environ["GMVUPUP_API_KEY"]},\n    json={\n      "model": "doubao-seedance-2.5",\n      "prompt": "A sneaker floating above lilac dunes, slow camera movement.",\n      "seconds": 5,\n      "size": "1280x720"\n    },\n    timeout=240,\n)\nresponse.raise_for_status()\nprint(response.json())',
-      javascript:
-        'const response = await fetch("https://gmvupup.top/v1/videos", {\n  method: "POST",\n  headers: {\n    Authorization: "Bearer " + process.env.GMVUPUP_API_KEY,\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    "model": "doubao-seedance-2.5",\n    "prompt": "A sneaker floating above lilac dunes, slow camera movement.",\n    "seconds": 5,\n    "size": "1280x720"\n  }),\n  signal: AbortSignal.timeout(240000),\n});\nif (!response.ok) throw new Error("HTTP " + response.status);\nconsole.log(await response.json());',
-    },
+    examples: API_EXAMPLES,
     fields: [
       {
         name: 'model',
         type: 'string',
         required: true,
         description:
-          'Use doubao-seedance-2.5 only when it is enabled for your account.',
+          'Use doubao-seedance-2.5 or doubao-seedance-2.0 with your GMVUPUP API key.',
       },
       {
-        name: 'prompt',
+        name: 'userPrompt',
         type: 'string',
         required: true,
-        description: 'Describe the scene, action and camera movement.',
+        description:
+          'Describe the scene, action and camera movement; 1–32000 characters, not blank.',
       },
       {
-        name: 'seconds',
+        name: 'duration',
         type: 'integer',
         required: true,
-        description: 'Requested duration in seconds; the example uses 5.',
+        description: 'Output duration: an integer from 4 to 15 seconds.',
       },
       {
-        name: 'size',
+        name: 'quality',
         type: 'string',
         required: true,
-        description: 'Select a supported size; the example uses 1280x720.',
+        description: 'Output resolution: 480p, 720p or 1080p.',
+      },
+      {
+        name: 'aspectRatio',
+        type: 'string',
+        required: true,
+        description: 'Aspect ratio: 21:9, 16:9, 4:3, 1:1, 3:4 or 9:16.',
+      },
+      {
+        name: 'firstImageUrl / lastImageUrl',
+        type: 'string',
+        required: false,
+        description:
+          'First and last frame URLs. At most 9 images in total, including refImageUrls.',
+      },
+      {
+        name: 'refImageUrls',
+        type: 'string[]',
+        required: false,
+        description:
+          'Reference image URLs; at most 9 images including first and last frames.',
+      },
+      {
+        name: 'refVideoUrls / refAudioUrls',
+        type: 'string[]',
+        required: false,
+        description: 'Reference video or audio URLs; at most 3 of each.',
+      },
+      {
+        name: 'generateAudio',
+        type: 'boolean',
+        required: false,
+        description:
+          'Whether to generate audio. Omit to use the upstream default.',
+      },
+      {
+        name: 'returnLastFrame',
+        type: 'boolean',
+        required: false,
+        description:
+          'Request a last-frame image. Download it only when lastFrameUrl is returned.',
+      },
+      {
+        name: 'seed',
+        type: 'integer',
+        required: false,
+        description: 'Random seed from -1 to 4294967295.',
+      },
+      {
+        name: 'bitrateMode',
+        type: 'string',
+        required: false,
+        description: 'Video bitrate preset: standard or high.',
       },
     ],
     response:
@@ -335,6 +385,9 @@ export const DOC_PAGES: Record<DocTopic, DocPage> = {
     notes: [
       'Save the returned id. Poll about every 10 seconds; queued and in_progress are not completed results. Download after completed, and inspect the error for failed tasks.',
       'A timeout does not cancel an existing task. Check the saved task ID before considering another submission.',
+      'Use absolute HTTP(S) URLs for reference media. Authorized asset://asset_ID references are also supported; local file paths and Base64 are not accepted.',
+      'When returnLastFrame is enabled and the completed response contains lastFrameUrl, download that relative path from https://gmvupup.top using the same API key.',
+      'The rate is per output second at the selected resolution, including requests with reference media. A failed task returns its reserved GMVUPUP quota.',
     ],
   },
   errors: {

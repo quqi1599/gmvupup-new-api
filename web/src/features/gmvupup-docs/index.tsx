@@ -61,6 +61,9 @@ export function GmvupupDocs(props: { topic: DocTopic }) {
       label: props.topic === 'quick-start' ? 'Connection details' : 'Overview',
     },
   ]
+  if (props.topic === 'videos') {
+    toc.push({ id: 'pricing', label: 'Current video pricing' })
+  }
   if (data.examples) toc.push({ id: 'request', label: 'Request example' })
   if (data.fields) {
     toc.push({

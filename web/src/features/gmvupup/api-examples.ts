@@ -16,30 +16,49 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-// GMVUPUP brand customization, 2026-11-08.
-// These examples document the local ccg-seedance adapter, not a live service claim.
+import type { PricingModel } from '@/features/pricing/types'
+
+export const SEEDANCE_MODELS = ['doubao-seedance-2.5', 'doubao-seedance-2.0']
+
+// Only the installed CCG provider uses this JSON request contract.
+export function isCcgSeedanceModel(model: PricingModel): boolean {
+  return (
+    SEEDANCE_MODELS.includes(model.model_name) &&
+    model.billing_plugin_variants?.length === 1 &&
+    model.billing_plugin_variants[0].plugin_key === 'ccg-seedance'
+  )
+}
+
 export const API_EXAMPLES = {
-  curl: `curl https://gmvupup.top/v1/videos \\\n  -H "Authorization: Bearer $GMVUPUP_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{
+  curl: `curl "https://gmvupup.top/v1/videos" \\
+  -H "Authorization: Bearer $GMVUPUP_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  --max-time 240 \\
+  -d '{
     "model": "doubao-seedance-2.5",
-    "prompt": "A sneaker floating above lilac dunes",
-    "seconds": 5,
-    "size": "1280x720"
+    "userPrompt": "A sneaker floating above lilac dunes, slow camera movement.",
+    "duration": 5,
+    "quality": "720p",
+    "aspectRatio": "16:9"
   }'`,
   python: `import os
 import requests
 
 response = requests.post(
     "https://gmvupup.top/v1/videos",
-    headers={"Authorization": f"Bearer {os.environ['GMVUPUP_API_KEY']}"},
+    headers={"Authorization": "Bearer " + os.environ["GMVUPUP_API_KEY"]},
     json={
         "model": "doubao-seedance-2.5",
-        "prompt": "A sneaker floating above lilac dunes",
-        "seconds": 5, "size": "1280x720",
+        "userPrompt": "A sneaker floating above lilac dunes, slow camera movement.",
+        "duration": 5,
+        "quality": "720p",
+        "aspectRatio": "16:9"
     },
-    timeout=60,
+    timeout=240,
 )
 response.raise_for_status()
-task = response.json()  # Save the task ID, then poll its status.`,
+task = response.json()
+print(task)  # Save task["id"] before polling.`,
   javascript: `const response = await fetch("https://gmvupup.top/v1/videos", {
   method: "POST",
   headers: {
@@ -47,11 +66,15 @@ task = response.json()  # Save the task ID, then poll its status.`,
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    model: "doubao-seedance-2.5",
-    prompt: "A sneaker floating above lilac dunes",
-    seconds: 5, size: "1280x720",
+    "model": "doubao-seedance-2.5",
+    "userPrompt": "A sneaker floating above lilac dunes, slow camera movement.",
+    "duration": 5,
+    "quality": "720p",
+    "aspectRatio": "16:9"
   }),
+  signal: AbortSignal.timeout(240000),
 });
 if (!response.ok) throw new Error("HTTP " + response.status);
-const task = await response.json(); // Save the ID before polling.`,
+const task = await response.json();
+console.log(task); // Save task.id before polling.`,
 }

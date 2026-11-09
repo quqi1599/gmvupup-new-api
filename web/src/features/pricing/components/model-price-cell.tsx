@@ -32,8 +32,12 @@ import {
 } from '../lib/dynamic-price'
 import { getFixedPriceUnit, isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
-import { taskUsageUnitLabel } from '../lib/task-price-display'
+import {
+  getVideoResolutionPrices,
+  taskUsageUnitLabel,
+} from '../lib/task-price-display'
 import type { PricingModel, TokenUnit } from '../types'
+import { VideoResolutionPrices } from './video-resolution-prices'
 
 export type ModelPriceCellOptions = {
   tokenUnit?: TokenUnit
@@ -95,6 +99,16 @@ export function ModelPriceCell(props: {
     unit: tokenUnitLabel,
   })
 
+  const resolutionPrices = getVideoResolutionPrices(props.model, {
+    ...options,
+    tokenUnit,
+    showCurrencySymbol: true,
+    groupRatioMultiplier: getDynamicDisplayGroupRatio(
+      props.model,
+      options.selectedGroup
+    ),
+  })
+  if (resolutionPrices) return <VideoResolutionPrices rows={resolutionPrices} />
   if (dynamic) {
     if (dynamic.isSpecialExpression) {
       return (

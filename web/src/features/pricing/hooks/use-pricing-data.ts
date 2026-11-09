@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
+import { isCcgSeedanceModel } from '@/features/gmvupup/api-examples'
 import { useStatus } from '@/hooks/use-status'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
@@ -56,6 +57,9 @@ export function usePricingData(enabled = true) {
       return {
         ...model,
         key: model.model_name,
+        supported_endpoint_types: isCcgSeedanceModel(model)
+          ? ['openai-video']
+          : model.supported_endpoint_types,
         vendor_name: vendor?.name,
         vendor_icon: vendor?.icon,
         vendor_description: vendor?.description,

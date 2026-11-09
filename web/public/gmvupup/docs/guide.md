@@ -90,13 +90,24 @@ curl "https://gmvupup.top/v1/chat/completions" \
 - 非流式回答可从 choices[0].message.content 读取。处理成功结果前先检查 HTTP 状态和错误响应。
 - 多模态输入、工具调用和流式输出属于不同能力，模型出现在目录中不等于支持所有可选功能。
 
-## 视频任务
+## Seedance 视频任务
 
-创建任务、查询进度，并获取完成后的视频。
+模型：`doubao-seedance-2.5`、`doubao-seedance-2.0`。使用本站 Key，通过 `POST /v1/videos` 提交 JSON。
 
-需要开通对应视频模型。
+### 人民币固定秒价
 
-POST /v1/videos
+2026-11-09 配置价格，default/vip/svip 当前分组倍率均为 1。实时价格以 https://gmvupup.top/pricing 为准。
+
+| 模型 | 480p 元/秒 | 720p 元/秒 | 1080p 元/秒 |
+| --- | ---: | ---: | ---: |
+| doubao-seedance-2.5 | 0.536 | 1.208 | 2.992 |
+| doubao-seedance-2.0 | 0.368 | 0.792 | 1.984 |
+
+费用 = 输出时长 × 对应分辨率秒价。比如 5 秒 720p，2.5 为 6.04 元，2.0 为 3.96 元。参考素材输入也使用对应分辨率的固定输出秒价。任务失败后退回本站预扣额度。
+
+定价参考[火山方舟中国区官方价格](https://ark.volcengine.com/region:cn-beijing/docs/model-pricing)中 16:9、无参考视频的每秒示例值 × 0.8；本站按固定秒价计费，不按实际视频 Token 重算。
+
+### 提交
 
 ```bash
 curl "https://gmvupup.top/v1/videos" \
@@ -104,25 +115,52 @@ curl "https://gmvupup.top/v1/videos" \
   -H "Content-Type: application/json" \
   --max-time 240 \
   -d '{
-  "model": "doubao-seedance-2.5",
-  "prompt": "A sneaker floating above lilac dunes, slow camera movement.",
-  "seconds": 5,
-  "size": "1280x720"
-}'
+    "model": "doubao-seedance-2.5",
+    "userPrompt": "A sneaker floating above lilac dunes, slow camera movement.",
+    "duration": 5,
+    "quality": "720p",
+    "aspectRatio": "16:9"
+  }'
 ```
+
+两模型请求格式一致。必填 `model`、`userPrompt`、`duration`、`quality`、`aspectRatio`：
+
+- `userPrompt`：1–32000 字符，不能全为空白。
+- `duration`：4–15 的整数秒。
+- `quality`：480p / 720p / 1080p。
+- `aspectRatio`：21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16。
+- `firstImageUrl`、`lastImageUrl`、`refImageUrls`：首尾帧与参考图片合计最多 9 张。
+- `refVideoUrls`、`refAudioUrls`：视频和音频参考各最多 3 个。
+- 参考素材使用可访问的绝对 HTTP(S) URL，或有权使用的 `asset://asset_ID`；不支持本地路径、Base64 和 multipart 上传。
+- 可选 `generateAudio`、`returnLastFrame` 为布尔值；`seed` 为 -1–4294967295 整数；`bitrateMode` 为 standard / high。
+- 不接受 `prompt`、`seconds`、`size` 等 OpenAI 视频字段。
+
+响应示意（不是实际生成结果）：
+
+```json
+{"id":"YOUR_TASK_ID","object":"video","status":"queued"}
+```
+
+### 查询和下载
+
+保存返回的 `id` 为 `TASK_ID`，约每 10 秒查询一次。`queued`、`in_progress` 表示处理中，`completed` 后可下载，`failed` 时读取错误原因。
 
 ```bash
 curl "https://gmvupup.top/v1/videos/$TASK_ID" \
   -H "Authorization: Bearer $GMVUPUP_API_KEY"
 
-# After status is completed:
+# 仅在 completed 后下载
 curl "https://gmvupup.top/v1/videos/$TASK_ID/content" \
   -H "Authorization: Bearer $GMVUPUP_API_KEY" \
   -o result.mp4
+
+# 仅在请求 returnLastFrame 且返回 lastFrameUrl 后下载
+curl "https://gmvupup.top/v1/tasks/$TASK_ID/artifacts/last_frame/content" \
+  -H "Authorization: Bearer $GMVUPUP_API_KEY" \
+  -o last-frame.jpg
 ```
 
-- 保存返回的 id，建议约每 10 秒查询一次。queued 和 in_progress 表示尚未完成；completed 后再下载，failed 时读取失败原因。
-- 超时不等于已有任务取消。考虑重新提交前，请先查询已保存的任务 ID。
+查询、下载均使用本站 Key 和本站任务 ID。超时后先查询原任务，不自动重复提交。完整参数和三种语言示例见 https://gmvupup.top/docs/videos 。
 
 ## 错误与重试
 
