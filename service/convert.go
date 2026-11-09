@@ -64,6 +64,16 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 			openAIRequest.Reasoning = reasoningJSON
 		}
 	} else {
+		// CPA owns provider-specific thinking translation. Preserve display and
+		// its associated controls before the Messages DTO becomes Chat.
+		if info.ChannelMeta != nil && info.ChannelOtherSettings.CPAAuditIdentityEnabled && claudeRequest.Thinking != nil && claudeRequest.Thinking.Display != "" {
+			thinkingJSON, err := common.Marshal(claudeRequest.Thinking)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal CPA thinking controls: %w", err)
+			}
+			openAIRequest.THINKING = thinkingJSON
+			openAIRequest.ReasoningEffort = claudeRequest.GetEfforts()
+		}
 		thinkingSuffix := "-thinking"
 		if strings.HasSuffix(info.OriginModelName, thinkingSuffix) &&
 			!strings.HasSuffix(openAIRequest.Model, thinkingSuffix) {
