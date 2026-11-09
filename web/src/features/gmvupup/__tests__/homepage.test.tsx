@@ -112,4 +112,23 @@ describe('GMVUPUP public homepage', () => {
     ).toBeVisible()
     expect(screen.queryByText(/500W|99\.99%/)).not.toBeInTheDocument()
   })
+  it('embeds the playable universe while retaining model logos and console access', async () => {
+    await renderHomepage()
+    const frame = screen.getByTitle('GMV ecommerce universe')
+    expect(frame).toHaveAttribute('src', '/gmv-universe.html?embedded=1')
+    expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-downloads')
+    for (const name of [
+      'GPT Image',
+      'Nano Banana',
+      'DeepSeek',
+      'Seedance',
+      'MiniMax',
+      'Gemini',
+    ]) {
+      expect(screen.getByRole('img', { name })).toBeVisible()
+    }
+    expect(
+      screen.getByRole('button', { name: 'Enter console' })
+    ).toHaveAttribute('href', '/dashboard')
+  })
 })
