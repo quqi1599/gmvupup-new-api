@@ -57,6 +57,9 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	} else {
 		convertedRequest, err := adaptor.ConvertImageRequest(c, info, *request)
 		if err != nil {
+			if info.ApiType == constant.APITypeMiniMax && dto.IsMiniMaxH3ImageModel(request.Model) {
+				return types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+			}
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed)
 		}
 		relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
@@ -93,6 +96,16 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	}
 
 	statusCodeMappingStr := c.GetString("status_code_mapping")
+	h3Image := info.ApiType == constant.APITypeMiniMax && dto.IsMiniMaxH3ImageModel(request.Model)
+	if h3Image {
+		// MiniMax explicitly disallows replay, including HTTP error responses.
+		// Apply at the attempt boundary so pass-through requests are covered too.
+		defer func() {
+			if newAPIError != nil {
+				types.ErrOptionWithSkipRetry()(newAPIError)
+			}
+		}()
+	}
 
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
@@ -118,6 +131,10 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	usage, newAPIError := adaptor.DoResponse(c, httpResp, info)
 	if count, known := openai.ConfirmedImageCount(c); known {
 		relaycommon.SetImageBillingOutcome(c, count, newAPIError != nil)
+		if h3Image && info.PriceData.UsePrice {
+			// H3 returns HTTP 200 even when some requested images failed.
+			info.PriceData.AddOtherRatio("n", float64(count))
+		}
 	}
 	if newAPIError != nil {
 		// reset status code 重置状态码

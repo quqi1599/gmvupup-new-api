@@ -65,6 +65,11 @@ func TestImagesHTTPAndBillingIntegration(t *testing.T) {
 	const partial = "data: {\"type\":\"image_generation.partial_image\",\"b64_json\":\"preview\"," + usage + "}\n\n"
 	const completed = "data: {\"type\":\"image_generation.completed\",\"b64_json\":\"complete\"," + usage + "}\n\n"
 	const broken = "data: broken\n\n"
+	const h3Success = "data: {\"type\":\"image_generation.partial_succeeded\",\"image_index\":0,\"url\":\"https://example.com/result.png\"}\n\n"
+	const h3Completed = "data: {\"type\":\"image_generation.completed\",\"usage\":{\"generated_images\":1,\"input_tokens\":10,\"output_tokens\":2,\"total_tokens\":12}}\n\n"
+	const h3JSON = `{"data":[{"url":"https://example.com/result.png"},{"error":{"code":"1027","message":"blocked"}}],"usage":{"generated_images":1,"input_tokens":10,"output_tokens":2,"total_tokens":12}}`
+	const h3TwoJSON = `{"data":[{"url":"https://example.com/1.png"},{"url":"https://example.com/2.png"}],"usage":{"generated_images":2,"input_tokens":10,"output_tokens":2,"total_tokens":12}}`
+	const h3PricedJSON = `{"data":[{"url":"https://example.com/result.png"}],"usage":{"generated_images":1,"input_tokens":2000000,"output_tokens":1000000,"total_tokens":3000000,"input_tokens_details":{"text_tokens":1000000,"image_tokens":1000000},"output_tokens_details":{"image_tokens":1000000}}}`
 	unit := int(common.QuotaPerUnit)
 	for _, tc := range []struct {
 		name, body          string
@@ -83,8 +88,26 @@ func TestImagesHTTPAndBillingIntegration(t *testing.T) {
 		{"json_disconnect", `{"data":[{"b64_json":"complete"}],` + usage + `}`, true, false, false, 0, 499, unit},
 		{"json_as_sse", `{"data":[{"b64_json":"complete"}],` + usage + `}`, false, true, false, -1, 0, 12},
 		{"sse_as_json", completed, false, false, true, -1, 0, 12},
+		{"h3_json_fixed_partial", h3JSON, true, false, false, -1, 0, unit},
+		{"h3_json_token_partial", h3JSON, false, false, false, -1, 0, 12},
+		{"h3_two_token_total", h3TwoJSON, false, false, false, -1, 0, 12},
+		{"h3_prices_standard", h3PricedJSON, false, false, false, -1, 0, 5700000},
+		{"h3_prices_highspeed", h3PricedJSON, false, false, false, -1, 0, 9675000},
+		{"h3_sse_fixed_partial", h3Success + h3Completed, true, true, true, -1, 0, unit},
+		{"h3_sse_token_partial", h3Success + h3Completed, false, true, true, -1, 0, 12},
+		{"h3_sse_interrupted", h3Success + broken, true, true, true, -1, 502, unit},
+		{"h3_buffered_interrupted", h3Success + broken, true, false, true, -1, 502, unit},
+		{"h3_json_disconnect", h3JSON, true, false, false, 0, 499, unit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			modelName, channelType := "gpt-image-2", constant.ChannelTypeOpenAI
+			h3 := strings.HasPrefix(tc.name, "h3_")
+			if h3 {
+				modelName, channelType = "MiniMax-H3-Image", constant.ChannelTypeMiniMax
+			}
+			if tc.name == "h3_prices_highspeed" {
+				modelName = "MiniMax-H3-Image-Highspeed"
+			}
 			var calls atomic.Int32
 			outbound := make(chan []byte, 1)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,23 +124,23 @@ func TestImagesHTTPAndBillingIntegration(t *testing.T) {
 			defer server.Close()
 			writer := &imageFailingHTTPWriter{ResponseRecorder: httptest.NewRecorder(), allow: tc.writes}
 			c, _ := gin.CreateTestContext(writer)
-			requestBody := `{"model":"gpt-image-2","prompt":"synthetic image","n":2,"stream":` + map[bool]string{true: "true", false: "false"}[tc.stream] + `,"partial_images":0,"output_compression":0}`
+			requestBody := `{"model":"` + modelName + `","prompt":"synthetic image","n":2,"stream":` + map[bool]string{true: "true", false: "false"}[tc.stream] + `,"partial_images":0,"output_compression":0}`
 			c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(requestBody))
 			c.Request.Header.Set("Content-Type", "application/json")
 			t.Cleanup(func() { common.CleanupBodyStorage(c) })
 			request, err := helper.GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
 			require.NoError(t, err)
-			common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+			common.SetContextKey(c, constant.ContextKeyChannelType, channelType)
 			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, server.URL)
-			common.SetContextKey(c, constant.ContextKeyOriginalModel, "gpt-image-2")
+			common.SetContextKey(c, constant.ContextKeyOriginalModel, modelName)
 			user := &model.User{Username: tc.name, AffCode: tc.name, Status: common.UserStatusEnabled, Quota: initialQuota}
 			require.NoError(t, db.Create(user).Error)
 			token := &model.Token{UserId: user.Id, Name: "image-test", Key: tc.name, Status: common.TokenStatusEnabled, RemainQuota: initialQuota, ExpiredTime: -1}
 			require.NoError(t, db.Create(token).Error)
-			channel := &model.Channel{Name: "image-test", Type: constant.ChannelTypeOpenAI}
+			channel := &model.Channel{Name: "image-test", Type: channelType}
 			require.NoError(t, db.Create(channel).Error)
 			common.SetContextKey(c, constant.ContextKeyChannelId, channel.Id)
-			info := &relaycommon.RelayInfo{IsStream: tc.stream, OriginModelName: "gpt-image-2", Request: request,
+			info := &relaycommon.RelayInfo{IsStream: tc.stream, OriginModelName: modelName, Request: request,
 				RelayMode: relayconstant.RelayModeImagesGenerations, RelayFormat: types.RelayFormatOpenAI,
 				RequestURLPath: "/v1/images/generations", StartTime: time.Now(), UserId: user.Id, TokenId: token.Id, TokenKey: token.Key,
 				UserSetting: dto.UserSetting{BillingPreference: "wallet_only", QuotaWarningThreshold: 1},
@@ -125,6 +148,15 @@ func TestImagesHTTPAndBillingIntegration(t *testing.T) {
 			}
 			if tc.fixed {
 				info.PriceData.AddOtherRatio("n", 2)
+			}
+			if strings.HasPrefix(tc.name, "h3_prices_") {
+				info.PriceData.ModelRatio = 1.725 // $2.30/M text input * 1.5 / 2
+				info.PriceData.ImageRatio = 1.5 / 2.3
+				info.PriceData.CompletionRatio = 3.8 / 2.3
+				if tc.name == "h3_prices_highspeed" {
+					info.PriceData.ImageRatio = 3.0 / 2.3
+					info.PriceData.CompletionRatio = 7.6 / 2.3
+				}
 			}
 			require.Nil(t, service.PreConsumeBilling(c, 2*unit, info))
 			apiErr := ImageHelper(c, info)
@@ -137,10 +169,12 @@ func TestImagesHTTPAndBillingIntegration(t *testing.T) {
 				require.True(t, types.IsSkipRetryError(apiErr))
 			}
 			wire := <-outbound
-			require.Equal(t, "gpt-image-2", gjson.GetBytes(wire, "model").String())
+			require.Equal(t, modelName, gjson.GetBytes(wire, "model").String())
 			require.True(t, gjson.GetBytes(wire, "stream").Exists())
 			require.Equal(t, tc.stream, gjson.GetBytes(wire, "stream").Bool())
-			require.Equal(t, "0", gjson.GetBytes(wire, "partial_images").Raw)
+			if !h3 {
+				require.Equal(t, "0", gjson.GetBytes(wire, "partial_images").Raw)
+			}
 			require.Equal(t, "0", gjson.GetBytes(wire, "output_compression").Raw)
 			require.False(t, info.Billing.NeedsRefund(), "settlement must finish exactly once even for partial failure")
 			info.Billing.Refund(c)
@@ -161,7 +195,11 @@ func TestImagesHTTPAndBillingIntegration(t *testing.T) {
 			}
 			require.Equal(t, 1.0, info.PriceData.ModelPrice)
 			if tc.fixed {
-				require.Equal(t, 2.0, info.PriceData.OtherRatios()["n"])
+				wantCount := 2.0
+				if h3 {
+					wantCount = 1
+				}
+				require.Equal(t, wantCount, info.PriceData.OtherRatios()["n"])
 			}
 		})
 	}
