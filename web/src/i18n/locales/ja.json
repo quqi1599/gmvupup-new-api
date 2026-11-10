@@ -7703,5 +7703,10 @@
     "Current video pricing": "Current video pricing",
     "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.": "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.",
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens."
-  }
+  },
+  "ZPay / Epay Gateway": "ZPay / Epay ゲートウェイ",
+  "Use ZPay gateway": "ZPay ゲートウェイを使用",
+  "ZPay documentation": "ZPay ドキュメント",
+  "ZPay supports Alipay and WeChat Pay through the Epay protocol. Enter your ZPay merchant ID and secret below, and add alipay or wxpay in General payment methods.": "ZPay は Epay 経由で Alipay と WeChat Pay に対応します。以下に ZPay の加盟店 ID とキーを入力し、一般の支払い方法に alipay または wxpay を追加してください。",
+  "ZPay charges in CNY. Check the top-up conversion price before saving. The gateway button only fills this form; save to apply.": "ZPay の決済通貨は CNY です。保存前にチャージの換算価格を確認してください。ボタンはフォームを入力するだけです。保存すると適用されます。"
 }

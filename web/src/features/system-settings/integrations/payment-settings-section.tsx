@@ -81,6 +81,7 @@ import {
   WaffoSettingsSection,
   type WaffoSettingsValues,
 } from './waffo-settings-section'
+import { ZpayPreset } from './zpay-preset'
 
 function isHttpOriginUrl(value: string) {
   const trimmed = value.trim()
@@ -884,7 +885,7 @@ export function PaymentSettingsSection({
             <div className='overflow-x-auto pb-1'>
               <TabsList className='grid min-w-[44rem] grid-cols-6'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
-                <TabsTrigger value='epay'>Epay</TabsTrigger>
+                <TabsTrigger value='epay'>ZPay / Epay</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
@@ -1141,8 +1142,11 @@ export function PaymentSettingsSection({
 
             <TabsContent value='epay' className={paymentTabContentClassName}>
               <div className='space-y-4'>
+                <ZpayPreset />
                 <div>
-                  <h3 className='text-lg font-medium'>{t('Epay Gateway')}</h3>
+                  <h3 className='text-lg font-medium'>
+                    {t('ZPay / Epay Gateway')}
+                  </h3>
                   <p className='text-muted-foreground text-sm'>
                     {t('Configuration for Epay payment integration')}
                   </p>

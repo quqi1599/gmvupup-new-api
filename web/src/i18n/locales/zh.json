@@ -7703,5 +7703,10 @@
     "Current video pricing": "当前视频价格",
     "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.": "下表读取默认分组的实时价格。费用 = 输出时长 × 对应分辨率秒价；其他分组请在控制台核对。",
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "固定秒价参考中国区官方 16:9、无参考视频的每秒示例价 × 0.8，不按视频 Token 重算。"
-  }
+  },
+  "ZPay / Epay Gateway": "ZPay / 易支付网关",
+  "Use ZPay gateway": "使用 ZPay 网关",
+  "ZPay documentation": "ZPay 接口文档",
+  "ZPay supports Alipay and WeChat Pay through the Epay protocol. Enter your ZPay merchant ID and secret below, and add alipay or wxpay in General payment methods.": "ZPay 通过易支付协议支持支付宝和微信支付。在下方填写 ZPay 商户 ID 与密钥，并在通用支付方式中添加 alipay 或 wxpay。",
+  "ZPay charges in CNY. Check the top-up conversion price before saving. The gateway button only fills this form; save to apply.": "ZPay 以人民币收款。保存前请检查充值兑换价格。网关按钮仅填入表单，保存后才生效。"
 }
