@@ -303,7 +303,7 @@ export const meta = {
     en: "Volcengine Doubao Seedance video generation and Seedream image generation",
     zh: "火山引擎豆包 Seedance 视频生成与 Seedream 图片生成",
   },
-  version: "1.4.0",
+  version: "1.4.1-gmvupup.1",
   author: { name: "QuantumNous" },
   channelTypes: [54, 45], // VolcEngine-type channels serve Ark video models with the same wire format
   models: Object.keys(VIDEO_MODELS).concat(Object.keys(IMAGE_MODELS)),
@@ -772,10 +772,15 @@ export const native = {
     const statusMap = { NOT_START: "queued", SUBMITTED: "queued", QUEUED: "queued", IN_PROGRESS: "running", SUCCESS: "succeeded", FAILURE: "failed" };
     const data = task.data && typeof task.data === "object" && !Array.isArray(task.data) ? task.data : {};
     const output = Object.assign({}, data, { id: task.task_id });
-    if (typeof output.status !== "string") output.status = statusMap[task.status] || "queued";
-    if (task.status === "FAILURE" && (output.status === "queued" || output.status === "running")) {
-      output.status = "failed";
-      output.error = { code: "InternalServiceError", message: task.fail_reason || "task failed" };
+    if (typeof output.status !== "string" || !output.status) output.status = statusMap[task.status] || "queued";
+    // A saved upstream response may predate a host timeout or other terminal
+    // failure. Keep genuine upstream failure details, but honor host failures.
+    if (task.status === "FAILURE") {
+      const upstreamFailed = ["failed", "expired", "cancelled"].includes(output.status);
+      if (!upstreamFailed) output.status = "failed";
+      if (!upstreamFailed || !output.error) {
+        output.error = { code: "InternalServiceError", message: task.fail_reason || "task failed" };
+      }
     }
     return output;
   },
@@ -795,7 +800,24 @@ export const native = {
     return task.data && typeof task.data === "object" && !Array.isArray(task.data) ? task.data : {};
   },
   error: function (ctx, error) {
-    return { error: { code: ERROR_CODES[error.httpStatus] || "InternalServiceError", message: error.message } };
+    const message = trimmed(error.message);
+    // The host carries a rejected upstream response as JSON in its message.
+    // Preserve Ark's structured error instead of flattening its code.
+    if (message.startsWith("{")) {
+      try {
+        const body = JSON.parse(message);
+        const upstream = body && body.error;
+        if (upstream && typeof upstream === "object" && !Array.isArray(upstream) && typeof upstream.code === "string" && upstream.code) {
+          return { error: upstream };
+        }
+      } catch (e) {
+        // Non-JSON failures retain the host's status mapping below.
+      }
+    }
+    const detail = error.code === "invalid_request"
+      ? message.replace(/^plugin \S+ hook \S+ failed: (?:Error: )?/, "").replace(/ at (?:\S+ )?\(?\S+:\d+:\d+\)?\s*$/, "")
+      : error.message;
+    return { error: { code: ERROR_CODES[error.httpStatus] || "InternalServiceError", message: detail } };
   },
 };
 

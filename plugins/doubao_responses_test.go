@@ -1149,6 +1149,52 @@ func TestDoubaoNativeOfficialBodies(t *testing.T) {
 		rendered, err := call([]string{"native", "error"}, map[string]any{}, map[string]any{"httpStatus": 400, "message": "content is required"})
 		require.NoError(t, err)
 		assert.Equal(t, map[string]any{"error": map[string]any{"code": "InvalidParameter", "message": "content is required"}}, rendered)
+		for _, staleStatus := range []string{"queued", "pending", "processing", "succeeded", "unknown", ""} {
+			t.Run("host failure overrides "+staleStatus, func(t *testing.T) {
+				result, err := call([]string{"native", "taskStatus"}, map[string]any{}, map[string]any{
+					"task_id": "task_pub", "status": "FAILURE", "fail_reason": "task timed out",
+					"data": map[string]any{"id": "task_upstream", "status": staleStatus},
+				})
+				require.NoError(t, err)
+				assert.Equal(t, map[string]any{"id": "task_pub", "status": "failed", "error": map[string]any{
+					"code": "InternalServiceError", "message": "task timed out",
+				}}, result)
+			})
+		}
+		result, err := call([]string{"native", "taskStatus"}, map[string]any{}, map[string]any{
+			"task_id": "task_pub", "status": "FAILURE", "fail_reason": "task timed out",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"id": "task_pub", "status": "failed", "error": map[string]any{
+			"code": "InternalServiceError", "message": "task timed out",
+		}}, result)
+		upstreamError := map[string]any{"code": "InvalidParameter.TaskTypeConstraint", "message": "ratio must be adaptive", "param": "ratio", "request_id": "fixture-request"}
+		for _, terminalStatus := range []string{"failed", "expired", "cancelled"} {
+			result, err = call([]string{"native", "taskStatus"}, map[string]any{}, map[string]any{
+				"task_id": "task_pub", "status": "FAILURE", "fail_reason": "fallback",
+				"data": map[string]any{"id": "task_upstream", "status": terminalStatus, "error": upstreamError},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, map[string]any{"id": "task_pub", "status": terminalStatus, "error": upstreamError}, result)
+		}
+		rawError, err := common.Marshal(map[string]any{"error": upstreamError})
+		require.NoError(t, err)
+		rendered, err = call([]string{"native", "error"}, map[string]any{}, map[string]any{
+			"httpStatus": 400, "message": string(rawError),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"error": upstreamError}, rendered)
+		rendered, err = call([]string{"native", "error"}, map[string]any{}, map[string]any{
+			"httpStatus": 400, "code": "invalid_request", "message": "plugin doubao hook createTask failed: Error: content is required at plugin.js:1:2",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"error": map[string]any{"code": "InvalidParameter", "message": "content is required"}}, rendered)
+		rendered, err = call([]string{"native", "error"}, map[string]any{}, map[string]any{
+			"httpStatus": 502, "message": "{invalid upstream JSON",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"error": map[string]any{"code": "InternalServiceError", "message": "{invalid upstream JSON"}}, rendered)
+
 	})
 
 	t.Run("Base64 images settle like URLs", func(t *testing.T) {
