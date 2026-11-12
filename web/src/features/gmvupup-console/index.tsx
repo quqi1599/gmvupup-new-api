@@ -28,10 +28,8 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { toIntlLocale } from '@/i18n/languages'
-import { getCurrencyLabel } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
-import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { ConsoleModelCard } from './model-card'
 import { getModelCategory } from './model-category'
@@ -46,7 +44,6 @@ export function GmvupupModelCatalog() {
   const { t, i18n } = useTranslation()
   const pricing = usePricingData()
   const userGroup = useAuthStore((state) => state.auth.user?.group)
-  useSystemConfigStore((state) => state.config.currency)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [group, setGroup] = useState<string>()
@@ -88,6 +85,13 @@ export function GmvupupModelCatalog() {
   const selectedModel =
     pricing.models.find((model) => model.model_name === detail) ?? null
   const locale = toIntlLocale(i18n.language)
+  let currencyLabel = '—'
+  if (!pricing.isLoading && !pricing.error) {
+    currencyLabel =
+      pricing.currencyLabel === 'CNY'
+        ? t('Chinese yuan (CNY/RMB)')
+        : (pricing.currencyLabel ?? '—')
+  }
   let content
   if (pricing.isLoading) {
     content = <LoadingState />
@@ -163,11 +167,7 @@ export function GmvupupModelCatalog() {
           </div>
           <div>
             <span>{t('Console currency')}</span>
-            <strong>
-              {getCurrencyLabel() === 'CNY'
-                ? t('Chinese yuan')
-                : getCurrencyLabel()}
-            </strong>
+            <strong>{currencyLabel}</strong>
             <span>{t('Prices from this platform')}</span>
           </div>
         </div>
@@ -231,7 +231,11 @@ export function GmvupupModelCatalog() {
             {t('{{count}} models displayed', { count: models.length })}
           </span>
         </div>
-        <p>{t('Image prices per image · video prices per second')}</p>
+        <p>
+          {!pricing.isLoading &&
+            !pricing.error &&
+            t('All prices are in {{currency}}.', { currency: currencyLabel })}
+        </p>
       </div>
       {content}
       {selectedModel && (

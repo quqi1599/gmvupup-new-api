@@ -34,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -54,6 +55,7 @@ import type {
 import { CreemProductsSection } from './creem-products-section'
 
 interface RechargeFormCardProps {
+  amountCurrency?: 'CNY' | 'USD'
   topupInfo: TopupInfo | null
   presetAmounts: PresetAmount[]
   selectedPreset: number | null
@@ -85,6 +87,7 @@ interface RechargeFormCardProps {
 
 export function RechargeFormCard({
   topupInfo,
+  amountCurrency = topupInfo?.amount_currency,
   presetAmounts,
   selectedPreset,
   onSelectPreset,
@@ -113,6 +116,7 @@ export function RechargeFormCard({
   enableWaffoPancakeTopup,
 }: RechargeFormCardProps) {
   const { t } = useTranslation()
+  const isCnyTopup = amountCurrency === 'CNY'
   const [localAmount, setLocalAmount] = useState(topupAmount.toString())
 
   useEffect(() => {
@@ -197,7 +201,11 @@ export function RechargeFormCard({
   return (
     <TitledCard
       title={t('Add Funds')}
-      description={t('Choose an amount and payment method')}
+      description={
+        isCnyTopup
+          ? t('Enter yuan. Pay ¥1 to receive ¥1.')
+          : t('Choose an amount and payment method')
+      }
       icon={<WalletCards className='h-4 w-4' />}
       iconTone='success'
       disableHoverEffect
@@ -228,10 +236,11 @@ export function RechargeFormCard({
                   </Label>
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 md:grid-cols-4'>
                     {presetAmounts.map((preset) => {
-                      const discount =
-                        preset.discount ||
-                        topupInfo?.discount?.[preset.value] ||
-                        1.0
+                      const discount = isCnyTopup
+                        ? 1
+                        : preset.discount ||
+                          topupInfo?.discount?.[preset.value] ||
+                          1.0
                       const {
                         displayValue,
                         actualPrice,
@@ -239,9 +248,9 @@ export function RechargeFormCard({
                         hasDiscount,
                       } = calculatePresetPricing(
                         preset.value,
-                        priceRatio,
+                        isCnyTopup ? 1 : priceRatio,
                         discount,
-                        usdExchangeRate
+                        isCnyTopup ? 1 : usdExchangeRate
                       )
                       return (
                         <Button
@@ -257,7 +266,9 @@ export function RechargeFormCard({
                         >
                           <div className='flex w-full items-center justify-between'>
                             <div className='text-base font-semibold sm:text-lg'>
-                              {formatNumber(displayValue)}
+                              {isCnyTopup
+                                ? formatLocalCurrencyAmount(displayValue)
+                                : formatNumber(displayValue)}
                             </div>
                             {hasDiscount && (
                               <div className='text-xs font-medium text-green-600'>
@@ -271,7 +282,9 @@ export function RechargeFormCard({
                                 t={t}
                                 i18nKey='Pay {{amount}} <savings>• Save {{saved}}</savings>'
                                 values={{
-                                  amount: formatCurrency(actualPrice),
+                                  amount: isCnyTopup
+                                    ? formatLocalCurrencyAmount(actualPrice)
+                                    : formatCurrency(actualPrice),
                                   saved: formatCurrency(savedAmount),
                                 }}
                                 components={{
@@ -280,7 +293,9 @@ export function RechargeFormCard({
                               />
                             ) : (
                               t('Pay {{amount}}', {
-                                amount: formatCurrency(actualPrice),
+                                amount: isCnyTopup
+                                  ? formatLocalCurrencyAmount(actualPrice)
+                                  : formatCurrency(actualPrice),
                               })
                             )}
                           </div>
@@ -296,7 +311,7 @@ export function RechargeFormCard({
                   htmlFor='topup-amount'
                   className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
                 >
-                  {t('Custom Amount')}
+                  {isCnyTopup ? t('Top-up amount (CNY)') : t('Custom Amount')}
                 </Label>
                 <div className='grid grid-cols-[minmax(0,1fr)_minmax(110px,0.55fr)] gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center'>
                   <Input
@@ -316,7 +331,9 @@ export function RechargeFormCard({
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {isCnyTopup
+                          ? formatLocalCurrencyAmount(paymentAmount)
+                          : formatCurrency(paymentAmount)}
                       </span>
                     )}
                   </div>

@@ -25,7 +25,12 @@ import { BillingHistoryDialog } from '@/features/wallet/components/dialogs/billi
 import en from '@/i18n/locales/en.json'
 import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
+import {
+  DEFAULT_CURRENCY_CONFIG,
+  useSystemConfigStore,
+} from '@/stores/system-config-store'
 
+import { PaymentConfirmDialog } from '../components/dialogs/payment-confirm-dialog'
 import { RechargeFormCard } from '../components/recharge-form-card'
 
 const i18n = createInstance()
@@ -125,3 +130,121 @@ it.each([
     expect(screen.getByPlaceholderText('Minimum 1')).toBeVisible()
   }
 )
+
+it('shows one yuan to pay and one yuan to receive without multiplying the CNY input', async () => {
+  useSystemConfigStore.getState().setConfig({
+    currency: {
+      ...DEFAULT_CURRENCY_CONFIG,
+      quotaDisplayType: 'CNY',
+      usdExchangeRate: 7.3,
+    },
+  })
+  render(
+    <I18nextProvider i18n={i18n}>
+      <RechargeFormCard
+        topupInfo={{
+          enable_online_topup: true,
+          enable_stripe_topup: false,
+          pay_methods: [],
+          min_topup: 1,
+          stripe_min_topup: 1,
+          amount_options: [1, 10, 100],
+          discount: {},
+          amount_currency: 'CNY',
+        }}
+        presetAmounts={[{ value: 1 }, { value: 10 }, { value: 100 }]}
+        selectedPreset={1}
+        topupAmount={1}
+        paymentAmount={1}
+        priceRatio={7.3}
+        usdExchangeRate={7.3}
+        calculating={false}
+        paymentLoading={null}
+        redemptionCode=''
+        redeeming={false}
+        onSelectPreset={vi.fn()}
+        onTopupAmountChange={vi.fn()}
+        onPaymentMethodSelect={vi.fn()}
+        onRedemptionCodeChange={vi.fn()}
+        onRedeem={vi.fn()}
+      />
+      <PaymentConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+        topupAmount={1}
+        paymentAmount={1}
+        calculating={false}
+        processing={false}
+        usdExchangeRate={7.3}
+        amountCurrency='CNY'
+        paymentMethod={{ type: 'alipay', name: '支付宝' }}
+      />
+    </I18nextProvider>
+  )
+  expect(screen.getByText('支付 ¥1').closest('button')).toHaveTextContent(
+    '¥1支付 ¥1'
+  )
+  expect(screen.getByText('支付 ¥100').closest('button')).toHaveTextContent(
+    '¥100支付 ¥100'
+  )
+  expect(screen.getByLabelText('充值金额（人民币元）')).toHaveValue(1)
+  expect(document.body).not.toHaveTextContent('7.3')
+  expect(document.body).not.toHaveTextContent('730')
+  useSystemConfigStore
+    .getState()
+    .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
+})
+
+it('keeps new RMB order credits at one yuan and old USD-based orders at their original RMB value', async () => {
+  useSystemConfigStore.getState().setConfig({
+    currency: {
+      ...DEFAULT_CURRENCY_CONFIG,
+      quotaDisplayType: 'CNY',
+      usdExchangeRate: 7.3,
+    },
+  })
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        total: 2,
+        items: [
+          {
+            id: 1,
+            user_id: 1,
+            status: 'pending',
+            amount: 0,
+            amount_cny: 1,
+            credited_quota: 68493,
+            money: 1,
+            trade_no: 'rmb-order',
+            payment_method: 'alipay',
+            create_time: 1,
+          },
+          {
+            id: 2,
+            user_id: 1,
+            status: 'pending',
+            amount: 1,
+            money: 7.3,
+            trade_no: 'legacy-order',
+            payment_method: 'alipay',
+            create_time: 1,
+          },
+        ],
+      },
+    },
+  })
+  render(
+    <I18nextProvider i18n={i18n}>
+      <BillingHistoryDialog open onOpenChange={vi.fn()} />
+    </I18nextProvider>
+  )
+  await screen.findByText('rmb-order')
+  expect(screen.getAllByText('¥1')).toHaveLength(2)
+  expect(screen.getAllByText('¥7.3')).toHaveLength(2)
+  useSystemConfigStore
+    .getState()
+    .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
+})

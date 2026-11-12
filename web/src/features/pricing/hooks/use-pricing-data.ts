@@ -20,15 +20,26 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import { isCcgSeedanceModel } from '@/features/gmvupup/api-examples'
-import { useStatus } from '@/hooks/use-status'
+import { getCurrencyLabel } from '@/lib/currency'
 import { requireServerSuccess } from '@/lib/server-error-message'
+import { statusQueryOptions } from '@/lib/status-query'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { getPricing } from '../api'
 
 export function usePricingData(enabled = true) {
-  const { status } = useStatus()
+  // Wait for the shared status query, not the possibly stale localStorage
+  // placeholder, before displaying monetary values.
+  const statusQuery = useQuery(statusQueryOptions)
+  const status = statusQuery.data
+  useSystemConfigStore((state) => state.config.currency)
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    refetch: refetchPricing,
+  } = useQuery({
     queryKey: ['pricing'],
     queryFn: async () => requireServerSuccess(await getPricing()),
     staleTime: 5 * 60 * 1000,
@@ -75,9 +86,10 @@ export function usePricingData(enabled = true) {
     usableGroup: data?.usable_group ?? {},
     endpointMap: data?.supported_endpoint ?? {},
     autoGroups: data?.auto_groups ?? [],
-    isLoading,
-    error,
-    refetch,
+    isLoading: isLoading || statusQuery.isLoading,
+    error: error || statusQuery.error,
+    refetch: () => Promise.all([refetchPricing(), statusQuery.refetch()]),
+    currencyLabel: status ? getCurrencyLabel() : null,
     priceRate,
     usdExchangeRate,
   }

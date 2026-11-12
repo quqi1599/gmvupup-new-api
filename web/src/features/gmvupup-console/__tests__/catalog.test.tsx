@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
@@ -26,6 +26,10 @@ import en from '@/i18n/locales/en.json'
 import { api } from '@/lib/api'
 import { STATUS_QUERY_KEY } from '@/lib/status-query'
 import { useAuthStore } from '@/stores/auth-store'
+import {
+  DEFAULT_CURRENCY_CONFIG,
+  useSystemConfigStore,
+} from '@/stores/system-config-store'
 
 import { GmvupupModelCatalog } from '../index'
 
@@ -62,12 +66,27 @@ const fixture = {
   auto_groups: [],
 }
 beforeEach(async () => {
-  await i18next.changeLanguage('en')
-  i18next.addResourceBundle('en', 'translation', en.translation, true, true)
+  await i18next.init({
+    lng: 'en',
+    fallbackLng: 'en',
+    resources: { en: { translation: en.translation } },
+    interpolation: { escapeValue: false },
+  })
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
-  client.setQueryData(STATUS_QUERY_KEY, { price: 7.3, usd_exchange_rate: 7.3 })
+  client.setQueryData(STATUS_QUERY_KEY, {
+    price: 7.3,
+    usd_exchange_rate: 7.3,
+    quota_display_type: 'CNY',
+  })
+  useSystemConfigStore.getState().setConfig({
+    currency: {
+      ...DEFAULT_CURRENCY_CONFIG,
+      quotaDisplayType: 'CNY',
+      usdExchangeRate: 7.3,
+    },
+  })
   useAuthStore
     .getState()
     .auth.setUser({ id: 99, username: 'test', role: 1, group: 'default' })
@@ -76,6 +95,10 @@ beforeEach(async () => {
 afterEach(() => {
   client.clear()
   useAuthStore.getState().auth.reset()
+  useSystemConfigStore
+    .getState()
+    .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
+  localStorage.removeItem('status')
   vi.restoreAllMocks()
 })
 function renderCatalog() {
@@ -112,4 +135,92 @@ it('reports a failed catalog and retries instead of displaying fake prices', asy
   vi.mocked(api.get).mockResolvedValue({ data: fixture })
   await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
   await waitFor(() => expect(screen.getByText('image-product')).toBeVisible())
+})
+
+it('states RMB and converts image and text prices with the site rate', async () => {
+  renderCatalog()
+  await screen.findByText('image-product')
+  expect(screen.getByText('Chinese yuan (CNY/RMB)')).toBeVisible()
+  expect(
+    screen.getByText(/All prices are in Chinese yuan \(CNY\/RMB\)\./)
+  ).toBeVisible()
+  expect(screen.getByText('¥0.73')).toBeVisible()
+  expect(screen.getByText('¥14.6')).toBeVisible()
+  expect(screen.getByText('¥29.2')).toBeVisible()
+  expect(document.body).not.toHaveTextContent('$')
+})
+
+it('waits for current currency settings even when old USD status is cached', async () => {
+  client.removeQueries({ queryKey: STATUS_QUERY_KEY })
+  localStorage.setItem(
+    'status',
+    JSON.stringify({
+      price: 1,
+      usd_exchange_rate: 1,
+      quota_display_type: 'USD',
+    })
+  )
+  useSystemConfigStore
+    .getState()
+    .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
+  let resolveStatus!: (value: {
+    data: {
+      success: boolean
+      data: {
+        price: number
+        usd_exchange_rate: number
+        quota_display_type: string
+      }
+    }
+  }) => void
+  const status = new Promise<Parameters<typeof resolveStatus>[0]>((resolve) => {
+    resolveStatus = resolve
+  })
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    if (url === '/api/status') return await status
+    return { data: fixture }
+  })
+  renderCatalog()
+  await waitFor(() => expect(client.getQueryData(['pricing'])).toBeDefined())
+  expect(screen.queryByText('image-product')).not.toBeInTheDocument()
+  expect(document.body).not.toHaveTextContent('USD')
+  expect(document.body).not.toHaveTextContent('$')
+  await act(async () =>
+    resolveStatus({
+      data: {
+        success: true,
+        data: { price: 7.3, usd_exchange_rate: 7.3, quota_display_type: 'CNY' },
+      },
+    })
+  )
+  expect(await screen.findByText('¥0.73')).toBeVisible()
+  expect(screen.getByText('Chinese yuan (CNY/RMB)')).toBeVisible()
+})
+
+it('offers retry when currency loading fails instead of showing USD prices', async () => {
+  client.removeQueries({ queryKey: STATUS_QUERY_KEY })
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    if (url === '/api/status') throw new Error('status offline')
+    return { data: fixture }
+  })
+  renderCatalog()
+  expect(
+    await screen.findByText('Could not load the model catalog')
+  ).toBeVisible()
+  expect(screen.queryByText('image-product')).not.toBeInTheDocument()
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data:
+      url === '/api/status'
+        ? {
+            success: true,
+            data: {
+              price: 7.3,
+              usd_exchange_rate: 7.3,
+              quota_display_type: 'CNY',
+            },
+          }
+        : fixture,
+  }))
+  await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(await screen.findByText('¥0.73')).toBeVisible()
 })

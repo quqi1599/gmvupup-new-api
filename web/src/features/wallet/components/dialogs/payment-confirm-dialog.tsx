@@ -47,6 +47,7 @@ interface PaymentConfirmDialogProps {
   processing: boolean
   discountRate?: number
   usdExchangeRate?: number
+  amountCurrency?: 'CNY' | 'USD'
 }
 
 export function PaymentConfirmDialog({
@@ -60,6 +61,7 @@ export function PaymentConfirmDialog({
   processing,
   discountRate = DEFAULT_DISCOUNT_RATE,
   usdExchangeRate = 1,
+  amountCurrency,
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
   const hasDiscount = discountRate > 0 && discountRate < 1 && paymentAmount > 0
@@ -84,11 +86,14 @@ export function PaymentConfirmDialog({
               {t('Topup Amount')}
             </span>
             <span className='text-lg font-semibold'>
-              {formatLocalCurrencyAmount(topupAmount * usdExchangeRate, {
-                digitsLarge: 2,
-                digitsSmall: 2,
-                abbreviate: false,
-              })}
+              {formatLocalCurrencyAmount(
+                topupAmount * (amountCurrency === 'CNY' ? 1 : usdExchangeRate),
+                {
+                  digitsLarge: 2,
+                  digitsSmall: 2,
+                  abbreviate: false,
+                }
+              )}
             </span>
           </div>
 
@@ -101,7 +106,9 @@ export function PaymentConfirmDialog({
             ) : (
               <div className='flex items-baseline gap-2'>
                 <span className='text-2xl font-semibold'>
-                  {formatCurrency(paymentAmount)}
+                  {amountCurrency === 'CNY'
+                    ? formatLocalCurrencyAmount(paymentAmount)
+                    : formatCurrency(paymentAmount)}
                 </span>
                 {hasDiscount && (
                   <span className='text-muted-foreground text-sm line-through'>

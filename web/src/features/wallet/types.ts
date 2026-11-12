@@ -120,6 +120,8 @@ export interface WaffoPayMethod {
  * Topup configuration information
  */
 export interface TopupInfo {
+  /** Currency of the amount entered for Epay top-ups. */
+  amount_currency?: 'CNY' | 'USD'
   /** Whether online topup is enabled */
   enable_online_topup: boolean
   /** Whether Stripe topup is enabled */
@@ -253,6 +255,10 @@ export type TopupStatus = 'success' | 'pending' | 'expired'
  * Topup billing record
  */
 export interface TopupRecord {
+  /** Entered yuan amount for new RMB orders; absent/zero for legacy USD orders. */
+  amount_cny?: number
+  /** Immutable wallet credit calculated when the RMB order was created. */
+  credited_quota?: number
   /** Record ID */
   id: number
   /** User ID */

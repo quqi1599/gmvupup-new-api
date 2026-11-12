@@ -25,6 +25,33 @@ jobs:
       packages: write
       id-token: write
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: topup_matrix
+          MYSQL_USER: topup_test
+          MYSQL_PASSWORD: ci-test-only
+          MYSQL_ROOT_PASSWORD: ci-test-only
+        ports:
+          - '127.0.0.1::3306'
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pci-test-only"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+          --cpus 1 --memory 1g
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: topup_matrix
+          POSTGRES_USER: topup_test
+          POSTGRES_PASSWORD: ci-test-only
+        ports:
+          - '127.0.0.1::5432'
+        options: >-
+          --health-cmd "pg_isready -U topup_test -d topup_matrix"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+          --cpus 1 --memory 512m
+
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -64,6 +91,18 @@ jobs:
           cache: false
         env:
           RUNNER_TOOL_CACHE: ${{ runner.temp }}/tool-cache
+
+      - name: Verify RMB order migrations and settlement on three databases
+        env:
+          GOWORK: 'off'
+          REQUIRE_TOPUP_DB_MATRIX: '1'
+          TEST_TOPUP_MYSQL_DSN: 'topup_test:ci-test-only@tcp(127.0.0.1:${{ job.services.mysql.ports[3306] }})/topup_matrix?charset=utf8mb4&parseTime=True&loc=Local'
+          TEST_TOPUP_POSTGRES_DSN: 'host=127.0.0.1 port=${{ job.services.postgres.ports[5432] }} user=topup_test password=ci-test-only dbname=topup_matrix sslmode=disable'
+        run: go test ./controller -run '^TestCNYTopUpDatabaseCompatibility$' -v -count=1 -timeout=180s
+
+      - name: Stop isolated database test containers before image build
+        if: always()
+        run: docker stop '${{ job.services.mysql.id }}' '${{ job.services.postgres.id }}'
 
       - name: Run full Go test suite
         env:

@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ErrorState as PricingErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
 
@@ -50,6 +51,9 @@ export function Pricing() {
     endpointMap,
     autoGroups,
     isLoading,
+    error,
+    refetch,
+    currencyLabel,
     priceRate,
     usdExchangeRate,
   } = usePricingData()
@@ -158,6 +162,19 @@ export function Pricing() {
     )
   }
 
+  if (error) {
+    return (
+      <PublicLayout showMainContainer={false}>
+        <main className='mx-auto w-full max-w-3xl px-3 pt-20'>
+          <PricingErrorState
+            title={t('Could not load the model catalog')}
+            onRetry={() => void refetch()}
+          />
+        </main>
+      </PublicLayout>
+    )
+  }
+
   return (
     <PublicLayout showMainContainer={false}>
       <div className='relative'>
@@ -187,9 +204,12 @@ export function Pricing() {
               })}
             </p>
             <p className='text-muted-foreground/60 mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
-              {t(
-                'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
-              )}
+              {t('All prices are in {{currency}}.', {
+                currency:
+                  currencyLabel === 'CNY'
+                    ? t('Chinese yuan (CNY/RMB)')
+                    : currencyLabel,
+              })}
             </p>
             <SearchBar
               value={searchInput}

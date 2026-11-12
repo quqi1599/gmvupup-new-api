@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -97,6 +98,12 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	amountCurrency := "USD"
+	discounts := operation_setting.GetPaymentSetting().AmountDiscount
+	if operation_setting.IsCNYDisplay() {
+		amountCurrency = "CNY"
+		discounts = map[int]float64{}
+	}
 	data := gin.H{
 		"enable_online_topup":              isEpayTopUpEnabled(),
 		"enable_stripe_topup":              isStripeTopUpEnabled(),
@@ -114,12 +121,13 @@ func GetTopUpInfo(c *gin.Context) {
 		}(),
 		"creem_products":          setting.CreemProducts,
 		"pay_methods":             payMethods,
+		"amount_currency":         amountCurrency,
 		"min_topup":               operation_setting.MinTopUp,
 		"stripe_min_topup":        setting.StripeMinTopUp,
 		"waffo_min_topup":         setting.WaffoMinTopUp,
 		"waffo_pancake_min_topup": setting.WaffoPancakeMinTopUp,
 		"amount_options":          operation_setting.GetPaymentSetting().AmountOptions,
-		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
+		"discount":                discounts,
 		"topup_link":              common.TopUpLink,
 	}
 	common.ApiSuccess(c, data)
@@ -149,9 +157,13 @@ func GetEpayClient() *epay.Client {
 }
 
 func getPayMoney(amount int64, group string) float64 {
+	// CNY top-ups are denominated in yuan: the entered and paid amounts match.
+	if operation_setting.IsCNYDisplay() {
+		return float64(amount)
+	}
 	dAmount := decimal.NewFromInt(amount)
 	// 充值金额以“展示类型”为准：
-	// - USD/CNY: 前端传 amount 为金额单位；TOKENS: 前端传 tokens，需要换成 USD 金额
+	// - USD/CUSTOM: amount uses internal credit units; TOKENS uses raw quota.
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		dAmount = dAmount.Div(dQuotaPerUnit)
@@ -280,6 +292,27 @@ func rejectInvalidTopUpQuota(c *gin.Context, userId int, amount int64) bool {
 	return false
 }
 
+// validateEpayTopUpQuota fixes the credit amount before an order is created.
+// Existing USD/token payment integrations retain their own request semantics.
+func validateEpayTopUpQuota(userID int, amount int64) (int, error) {
+	var quota int
+	var err error
+	if operation_setting.IsCNYDisplay() {
+		rate := operation_setting.USDExchangeRate
+		if rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) || common.QuotaPerUnit <= 0 || math.IsNaN(common.QuotaPerUnit) || math.IsInf(common.QuotaPerUnit, 0) {
+			return 0, common.NewMessage("Invalid top-up currency configuration")
+		}
+		quota, err = validateCreditedQuota(decimal.NewFromInt(amount).
+			Mul(decimal.NewFromFloat(common.QuotaPerUnit)).Div(decimal.NewFromFloat(rate)))
+	} else {
+		quota, err = validateTopUpQuota(amount)
+	}
+	if err == nil {
+		err = model.ValidateTopUpQuotaCapacity(userID, quota)
+	}
+	return quota, err
+}
+
 func RequestEpay(c *gin.Context) {
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
@@ -292,7 +325,9 @@ func RequestEpay(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
-	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+	creditedQuota, err := validateEpayTopUpQuota(id, req.Amount)
+	if err != nil {
+		paymentError(c, err)
 		return
 	}
 
@@ -354,6 +389,13 @@ func RequestEpay(c *gin.Context) {
 		PaymentProvider: model.PaymentProviderEpay,
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
+	}
+	if operation_setting.IsCNYDisplay() {
+		// Legacy whole-USD Amount cannot represent a one-yuan credit. Keep it zero
+		// so a rollback to an old binary rejects settlement instead of overcrediting.
+		topUp.Amount = 0
+		topUp.AmountCNY = req.Amount
+		topUp.CreditedQuota = int64(creditedQuota)
 	}
 	err = topUp.Insert()
 	if err != nil {
@@ -517,7 +559,9 @@ func RequestAmount(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
-	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+	_, err = validateEpayTopUpQuota(id, req.Amount)
+	if err != nil {
+		paymentError(c, err)
 		return
 	}
 	group, err := model.GetUserGroup(id, true)
