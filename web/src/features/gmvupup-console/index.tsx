@@ -26,6 +26,10 @@ import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  selectCustomerModels,
+  getCustomerModelSearchNames,
+} from '@/features/gmvupup/customer-models'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
@@ -57,12 +61,16 @@ export function GmvupupModelCatalog() {
   ])
   const selectedGroup =
     group ?? (userGroup && groups.includes(userGroup) ? userGroup : groups[0])
+  const catalogModels = useMemo(
+    () => selectCustomerModels(pricing.models, selectedGroup),
+    [pricing.models, selectedGroup]
+  )
   const models = useMemo(
     () =>
-      pricing.models
+      catalogModels
         .filter((model) => {
           const haystack = [
-            model.model_name,
+            getCustomerModelSearchNames(model),
             model.description,
             model.vendor_name,
           ]
@@ -80,7 +88,7 @@ export function GmvupupModelCatalog() {
             (a.model_name ?? '').localeCompare(b.model_name ?? '')
           )
         }),
-    [pricing.models, category, search]
+    [catalogModels, category, search]
   )
   const selectedModel =
     pricing.models.find((model) => model.model_name === detail) ?? null
@@ -161,7 +169,7 @@ export function GmvupupModelCatalog() {
             <strong>
               {pricing.isLoading
                 ? '—'
-                : formatNumber(pricing.models.length, locale)}
+                : formatNumber(catalogModels.length, locale)}
             </strong>
             <span>{t('Available models')}</span>
           </div>
@@ -234,7 +242,10 @@ export function GmvupupModelCatalog() {
         <p>
           {!pricing.isLoading &&
             !pricing.error &&
-            t('All prices are in {{currency}}.', { currency: currencyLabel })}
+            t('All prices are in {{currency}}.', {
+              currency: currencyLabel,
+            })}{' '}
+          {t('Prices include the billing unit for each model')}
         </p>
       </div>
       {content}

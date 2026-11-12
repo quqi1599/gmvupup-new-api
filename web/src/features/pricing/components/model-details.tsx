@@ -48,6 +48,10 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  getCustomerModelName,
+  getCustomerModelDescriptionKey,
+} from '@/features/gmvupup/customer-models'
 import { getPerfMetrics } from '@/features/performance-metrics/api'
 import {
   formatLatency,
@@ -599,14 +603,17 @@ function ModelHeader(props: { model: PricingModel }) {
   const model = props.model
   const modelIconKey = model.icon || model.vendor_icon
   const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 20) : null
-  const description = model.description || model.vendor_description || null
+  const descriptionKey = getCustomerModelDescriptionKey(model)
+  const description = descriptionKey
+    ? t(descriptionKey)
+    : model.description || model.vendor_description || null
 
   return (
     <header className='pb-4'>
       <div className='flex items-center gap-2.5'>
         {modelIcon}
         <h1 className='font-mono text-xl font-bold tracking-tight sm:text-2xl'>
-          {model.model_name}
+          {getCustomerModelName(model)}
         </h1>
         <CopyButton
           value={model.model_name || ''}
@@ -1584,7 +1591,7 @@ export function ModelDetailsDrawer(props: ModelDetailsDrawerProps) {
         )}
       >
         <SheetHeader className='sr-only'>
-          <SheetTitle>{props.model.model_name}</SheetTitle>
+          <SheetTitle>{getCustomerModelName(props.model)}</SheetTitle>
           <SheetDescription>{t('Model details')}</SheetDescription>
         </SheetHeader>
         <div className='flex-1 overflow-y-auto px-4 pt-11 pb-5 sm:px-6 sm:pt-12 sm:pb-6'>

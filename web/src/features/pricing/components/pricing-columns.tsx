@@ -26,6 +26,7 @@ import {
 } from '@/components/data-table'
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
+import { getCustomerModelName } from '@/features/gmvupup/customer-models'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
 import { parseTags } from '../lib/filters'
@@ -62,7 +63,7 @@ export function usePricingColumns(
           <div className='flex max-w-full min-w-0 items-center gap-2'>
             {modelIcon}
             <span className='truncate font-mono text-sm font-medium'>
-              {model.model_name}
+              {getCustomerModelName(model)}
             </span>
           </div>
         )

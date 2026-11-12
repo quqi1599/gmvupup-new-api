@@ -79,6 +79,7 @@ export function Pricing() {
     setTokenUnit,
     setViewMode,
     setShowRechargePrice,
+    customerModels,
     filteredModels,
     hasActiveFilters,
     activeFilterCount,
@@ -200,7 +201,7 @@ export function Pricing() {
             </h1>
             <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>
               {t('This site currently has {{count}} models enabled', {
-                count: models?.length || 0,
+                count: customerModels.length,
               })}
             </p>
             <p className='text-muted-foreground/60 mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
@@ -238,7 +239,7 @@ export function Pricing() {
               groups={availableGroups}
               groupRatios={groupRatio}
               tags={availableTags}
-              models={models || []}
+              models={customerModels}
               hasActiveFilters={hasActiveFilters}
               onClearFilters={clearFilters}
               className='hover-scrollbar sticky top-20 hidden max-h-[calc(100dvh-6rem)] self-start overflow-y-auto xl:block'
@@ -247,7 +248,7 @@ export function Pricing() {
             <main className='min-w-0 space-y-4'>
               <PricingToolbar
                 filteredCount={filteredModels.length}
-                totalCount={models?.length}
+                totalCount={customerModels.length}
                 sortBy={sortBy}
                 onSortChange={setSortBy}
                 tokenUnit={tokenUnit}
@@ -270,7 +271,7 @@ export function Pricing() {
                 groups={availableGroups}
                 groupRatios={groupRatio}
                 tags={availableTags}
-                models={models || []}
+                models={customerModels}
                 hasActiveFilters={hasActiveFilters}
                 activeFilterCount={activeFilterCount}
                 onClearFilters={clearFilters}

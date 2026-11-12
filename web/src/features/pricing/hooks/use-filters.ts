@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useSearch } from '@tanstack/react-router'
 import { useMemo, useCallback, useState } from 'react'
 
+import { selectCustomerModels } from '@/features/gmvupup/customer-models'
 import { useDebounce } from '@/hooks/use-debounce'
 
 import {
@@ -141,15 +142,24 @@ export function useFilters(models: PricingModel[]) {
     [updateFilters]
   )
 
-  const availableTags = useMemo(() => {
-    if (!models || models.length === 0) return []
-    return extractAllTags(models)
-  }, [models])
+  const customerModels = useMemo(
+    () =>
+      selectCustomerModels(
+        models,
+        groupFilter === FILTER_ALL ? undefined : groupFilter
+      ),
+    [models, groupFilter]
+  )
+
+  const availableTags = useMemo(
+    () => extractAllTags(customerModels),
+    [customerModels]
+  )
 
   const filteredModels = useMemo(() => {
-    if (!models || models.length === 0) return []
+    if (customerModels.length === 0) return []
 
-    return filterAndSortModels(models, {
+    return filterAndSortModels(customerModels, {
       search: debouncedSearchInput,
       vendor: vendorFilter,
       group: groupFilter,
@@ -159,7 +169,7 @@ export function useFilters(models: PricingModel[]) {
       sortBy,
     })
   }, [
-    models,
+    customerModels,
     debouncedSearchInput,
     vendorFilter,
     groupFilter,
@@ -224,6 +234,7 @@ export function useFilters(models: PricingModel[]) {
     setTokenUnit,
     setViewMode,
     setShowRechargePrice,
+    customerModels,
     filteredModels,
     hasActiveFilters,
     activeFilterCount,

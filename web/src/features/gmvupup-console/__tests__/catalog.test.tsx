@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
@@ -135,6 +135,74 @@ it('reports a failed catalog and retries instead of displaying fake prices', asy
   vi.mocked(api.get).mockResolvedValue({ data: fixture })
   await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
   await waitFor(() => expect(screen.getByText('image-product')).toBeVisible())
+})
+
+it('shows one Seedance product with native pricing and copies its callable ID', async () => {
+  const user = userEvent.setup()
+  const models = [
+    {
+      ...fixture.data[0],
+      model_name: 'doubao-seedance-2.5',
+      supported_endpoint_types: ['openai-video'],
+      description: 'Old second pricing',
+    },
+    {
+      ...fixture.data[0],
+      model_name: 'doubao-seedance-2-5-260628',
+      supported_endpoint_types: ['openai-video'],
+      billing_plugin_variants: [{ plugin_key: 'doubao' }],
+      description: 'Native video pricing',
+    },
+    {
+      ...fixture.data[0],
+      model_name: 'doubao-seedance-2.0',
+      supported_endpoint_types: ['openai-video'],
+    },
+    {
+      ...fixture.data[0],
+      model_name: 'doubao-seedance-2-0-260128',
+      supported_endpoint_types: ['openai-video'],
+      billing_plugin_variants: [{ plugin_key: 'doubao' }],
+    },
+  ]
+  vi.mocked(api.get).mockResolvedValue({
+    data: { ...fixture, data: [...fixture.data, ...models] },
+  })
+  renderCatalog()
+  const heading = await screen.findByRole('heading', {
+    name: 'Seedance 2.5',
+    level: 2,
+  })
+  expect(
+    screen.getAllByRole('heading', { name: 'Seedance 2.5', level: 2 })
+  ).toHaveLength(1)
+  expect(
+    screen.getAllByRole('heading', { name: 'Seedance 2.0', level: 2 })
+  ).toHaveLength(1)
+  expect(screen.queryByText('Old second pricing')).not.toBeInTheDocument()
+  expect(screen.getByText('4 models displayed')).toBeVisible()
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Model type' }),
+    'video'
+  )
+  expect(screen.getByText('2 models displayed')).toBeVisible()
+  expect(heading).toBeVisible()
+  const card = heading.closest('header')
+  if (!card) throw new Error('Model card header missing')
+  await user.click(
+    within(card).getByRole('button', { name: 'Copy model name' })
+  )
+  expect(await navigator.clipboard.readText()).toBe(
+    'doubao-seedance-2-5-260628'
+  )
+  await user.type(
+    screen.getByRole('searchbox', { name: 'Search models' }),
+    'doubao-seedance-2.5'
+  )
+  expect(
+    screen.getByRole('heading', { name: 'Seedance 2.5', level: 2 })
+  ).toBeVisible()
+  expect(screen.getByText('1 models displayed')).toBeVisible()
 })
 
 it('states RMB and converts image and text prices with the site rate', async () => {

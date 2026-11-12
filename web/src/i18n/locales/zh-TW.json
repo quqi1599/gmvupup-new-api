@@ -7707,7 +7707,10 @@
     "The rate is per output second at the selected resolution, including requests with reference media. A failed task returns its reserved GMVUPUP quota.": "The rate is per output second at the selected resolution, including requests with reference media. A failed task returns its reserved GMVUPUP quota.",
     "Current video pricing": "Current video pricing",
     "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.": "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.",
-    "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens."
+    "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
+    "Prices include the billing unit for each model": "各模型價格均標明計費單位",
+    "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "支援文字生成影片、圖片參考和影片編輯。依影片 Token 計費，價格視解析度及是否使用參考影片而定。",
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "支援文字、圖片和參考影片創作。依影片 Token 計費，價格視解析度及是否使用參考影片而定。"
   },
   "ZPay / Epay Gateway": "ZPay / 易支付閘道",
   "Use ZPay gateway": "使用 ZPay 閘道",

@@ -24,6 +24,7 @@ import { CopyButton } from '@/components/copy-button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
+import { selectCustomerModels } from '@/features/gmvupup/customer-models'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
 export function ModelCatalog() {
@@ -55,7 +56,7 @@ export function ModelCatalog() {
   }
   return (
     <div className='gmv-doc-model-catalog'>
-      {models.map((model) => (
+      {selectCustomerModels(models).map((model) => (
         <div className='gmv-doc-model-row' key={model.model_name}>
           <Box size={20} aria-hidden='true' />
           <div>

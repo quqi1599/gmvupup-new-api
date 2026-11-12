@@ -19,7 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-import { isCcgSeedanceModel } from '@/features/gmvupup/api-examples'
+import {
+  getModelEndpointTypes,
+  MODEL_API_ENDPOINTS,
+} from '@/features/gmvupup/model-api'
 import { getCurrencyLabel } from '@/lib/currency'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { statusQueryOptions } from '@/lib/status-query'
@@ -65,12 +68,11 @@ export function usePricingData(enabled = true) {
       const vendor = model.vendor_id
         ? vendorMap.get(model.vendor_id)
         : undefined
+      const endpoints = getModelEndpointTypes(model)
       return {
         ...model,
         key: model.model_name,
-        supported_endpoint_types: isCcgSeedanceModel(model)
-          ? ['openai-video']
-          : model.supported_endpoint_types,
+        supported_endpoint_types: endpoints,
         vendor_name: vendor?.name,
         vendor_icon: vendor?.icon,
         vendor_description: vendor?.description,
@@ -84,7 +86,7 @@ export function usePricingData(enabled = true) {
     vendors: data?.vendors ?? [],
     groupRatio: data?.group_ratio ?? {},
     usableGroup: data?.usable_group ?? {},
-    endpointMap: data?.supported_endpoint ?? {},
+    endpointMap: { ...data?.supported_endpoint, ...MODEL_API_ENDPOINTS },
     autoGroups: data?.auto_groups ?? [],
     isLoading: isLoading || statusQuery.isLoading,
     error: error || statusQuery.error,

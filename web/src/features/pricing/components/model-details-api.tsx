@@ -16,14 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import {
-  ChevronRight,
-  Gauge,
-  KeyRound,
-  ScrollText,
-  Sigma,
-  Zap,
-} from 'lucide-react'
+import { ChevronRight, KeyRound, ScrollText, Sigma, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { BundledLanguage } from 'shiki/bundle/web'
@@ -42,12 +35,16 @@ import {
   API_EXAMPLES,
   isCcgSeedanceModel,
 } from '@/features/gmvupup/api-examples'
+import { isNativeSeedanceModel } from '@/features/gmvupup/customer-models'
+import {
+  buildModelApiExample,
+  getModelEndpointTypes,
+  MODEL_API_ENDPOINTS,
+} from '@/features/gmvupup/model-api'
 import { useStatus } from '@/hooks/use-status'
 
 import {
-  buildRateLimits,
   buildSupportedParameters,
-  formatRateLimit,
   type SupportedParameter,
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
@@ -240,59 +237,6 @@ function buildAnthropicSample(lang: Lang, ctx: SampleContext): string {
   ].join('\n')
 }
 
-function buildGeminiSample(lang: Lang, ctx: SampleContext): string {
-  const url = `${ctx.baseUrl}${ctx.endpointPath}?key=$${ctx.apiKeyEnv}`
-  const userMessage = 'Explain quantum entanglement in one paragraph.'
-
-  if (lang === 'curl') {
-    const body = JSON.stringify(
-      { contents: [{ parts: [{ text: userMessage }] }] },
-      null,
-      2
-    )
-    return [
-      `curl '${url}' \\`,
-      `  -H 'Content-Type: application/json' \\`,
-      `  -d '${body.replaceAll('\n', '\n     ')}'`,
-    ].join('\n')
-  }
-  if (lang === 'python') {
-    return [
-      'import google.generativeai as genai',
-      '',
-      `genai.configure(api_key="<YOUR_API_KEY>")`,
-      '',
-      `model = genai.GenerativeModel("${ctx.modelName}")`,
-      `response = model.generate_content("${userMessage}")`,
-      '',
-      `print(response.text)`,
-    ].join('\n')
-  }
-  if (lang === 'typescript') {
-    return [
-      `import { GoogleGenerativeAI } from '@google/generative-ai'`,
-      '',
-      `const genAI = new GoogleGenerativeAI(process.env.${ctx.apiKeyEnv}!)`,
-      `const model = genAI.getGenerativeModel({ model: '${ctx.modelName}' })`,
-      '',
-      `const result = await model.generateContent('${userMessage}')`,
-      `console.log(result.response.text())`,
-    ].join('\n')
-  }
-  return [
-    `const response = await fetch('${url}', {`,
-    `  method: 'POST',`,
-    `  headers: { 'Content-Type': 'application/json' },`,
-    `  body: JSON.stringify({`,
-    `    contents: [{ parts: [{ text: '${userMessage}' }] }],`,
-    `  }),`,
-    `})`,
-    '',
-    `const data = await response.json()`,
-    `console.log(data.candidates[0].content.parts[0].text)`,
-  ].join('\n')
-}
-
 function buildEmbeddingSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
   const text = 'The food was delicious and the waiter…'
@@ -355,89 +299,15 @@ function buildEmbeddingSample(lang: Lang, ctx: SampleContext): string {
   ].join('\n')
 }
 
-function buildImageSample(lang: Lang, ctx: SampleContext): string {
-  const url = `${ctx.baseUrl}${ctx.endpointPath}`
-  const prompt = 'A serene koi pond at sunset, ukiyo-e style.'
-
-  if (lang === 'curl') {
-    const body = JSON.stringify(
-      { model: ctx.modelName, prompt, size: '1024x1024', n: 1 },
-      null,
-      2
-    )
-    return [
-      `curl ${url} \\`,
-      `  -H "Authorization: Bearer $${ctx.apiKeyEnv}" \\`,
-      `  -H "Content-Type: application/json" \\`,
-      `  -d '${body.replaceAll('\n', '\n     ')}'`,
-    ].join('\n')
-  }
-  if (lang === 'python') {
-    return [
-      'from openai import OpenAI',
-      '',
-      `client = OpenAI(base_url="${ctx.baseUrl}/v1", api_key="<YOUR_API_KEY>")`,
-      '',
-      'response = client.images.generate(',
-      `    model="${ctx.modelName}",`,
-      `    prompt="${prompt}",`,
-      `    size="1024x1024",`,
-      `    n=1,`,
-      ')',
-      '',
-      'print(response.data[0].url)',
-    ].join('\n')
-  }
-  if (lang === 'typescript') {
-    return [
-      `import OpenAI from 'openai'`,
-      '',
-      `const client = new OpenAI({`,
-      `  baseURL: '${ctx.baseUrl}/v1',`,
-      `  apiKey: process.env.${ctx.apiKeyEnv},`,
-      `})`,
-      '',
-      `const response = await client.images.generate({`,
-      `  model: '${ctx.modelName}',`,
-      `  prompt: '${prompt}',`,
-      `  size: '1024x1024',`,
-      `  n: 1,`,
-      `})`,
-      '',
-      `console.log(response.data[0].url)`,
-    ].join('\n')
-  }
-  return [
-    `const response = await fetch('${url}', {`,
-    `  method: 'POST',`,
-    `  headers: {`,
-    `    Authorization: \`Bearer \${process.env.${ctx.apiKeyEnv}}\`,`,
-    `    'Content-Type': 'application/json',`,
-    `  },`,
-    `  body: JSON.stringify({`,
-    `    model: '${ctx.modelName}',`,
-    `    prompt: '${prompt}',`,
-    `    size: '1024x1024',`,
-    `    n: 1,`,
-    `  }),`,
-    `})`,
-    '',
-    `const data = await response.json()`,
-    `console.log(data.data[0].url)`,
-  ].join('\n')
-}
-
 function buildSample(
   lang: Lang,
   endpointType: string,
   ctx: SampleContext
 ): string {
   if (endpointType === 'anthropic') return buildAnthropicSample(lang, ctx)
-  if (endpointType === 'gemini') return buildGeminiSample(lang, ctx)
   if (endpointType === 'embeddings' || endpointType === 'jina-rerank') {
     return buildEmbeddingSample(lang, ctx)
   }
-  if (endpointType === 'image-generation') return buildImageSample(lang, ctx)
   return buildChatSample(lang, ctx)
 }
 
@@ -466,10 +336,10 @@ function CodeSamplesSection(props: {
   }, [status])
 
   const endpoints = useMemo(() => {
-    const types = props.model.supported_endpoint_types || []
+    const types = getModelEndpointTypes(props.model)
     return types
       .map((type) => {
-        const info = props.endpointMap[type] || {}
+        const info = MODEL_API_ENDPOINTS[type] ?? props.endpointMap[type] ?? {}
         let path = info.path || ''
         if (path && path.includes('{model}')) {
           path = replaceModelInPath(path, props.model.model_name || '')
@@ -493,15 +363,25 @@ function CodeSamplesSection(props: {
   }
 
   const ccgExample = API_EXAMPLES[lang === 'typescript' ? 'javascript' : lang]
-  const code = isCcgSeedanceModel(props.model)
-    ? ccgExample.replaceAll('doubao-seedance-2.5', props.model.model_name)
-    : buildSample(lang, activeEndpoint.type, {
-        baseUrl,
-        apiKeyEnv: 'NEW_API_KEY',
-        modelName: props.model.model_name || '',
-        endpointType: activeEndpoint.type,
-        endpointPath: activeEndpoint.path,
-      })
+  const sampleContext = {
+    baseUrl,
+    apiKeyEnv: 'NEW_API_KEY',
+    modelName: props.model.model_name,
+    endpointType: activeEndpoint.type,
+    endpointPath: activeEndpoint.path,
+  }
+  let code =
+    buildModelApiExample({
+      model: props.model,
+      endpointType: activeEndpoint.type,
+      path: activeEndpoint.path,
+      language: lang,
+      baseUrl,
+      apiKeyEnv: 'NEW_API_KEY',
+    }) ?? buildSample(lang, activeEndpoint.type, sampleContext)
+  if (isCcgSeedanceModel(props.model)) {
+    code = ccgExample.replaceAll('doubao-seedance-2.5', props.model.model_name)
+  }
 
   return (
     <section>
@@ -670,65 +550,6 @@ function ParamRangeCell(props: { param: SupportedParameter }) {
 }
 
 // ---------------------------------------------------------------------------
-// Rate-limits table
-// ---------------------------------------------------------------------------
-
-function RateLimitsSection(props: { model: PricingModel }) {
-  const { t } = useTranslation()
-  const limits = useMemo(() => buildRateLimits(props.model), [props.model])
-
-  if (limits.length === 0) return null
-
-  return (
-    <section>
-      <SectionTitle icon={Gauge}>{t('Rate limits')}</SectionTitle>
-      <StaticDataTable
-        className={tableStyles.sectionContainer}
-        headerRowClassName={tableStyles.mutedHeaderRow}
-        data={limits}
-        getRowKey={(limit) => limit.group}
-        getRowClassName={() => 'hover:bg-muted/20'}
-        columns={[
-          {
-            id: 'group',
-            header: t('Group'),
-            className: 'h-9',
-            cellClassName: 'py-2 font-mono',
-            cell: (limit) => limit.group,
-          },
-          {
-            id: 'rpm',
-            header: 'RPM',
-            className: 'h-9 text-right',
-            cellClassName: tableStyles.topNumericCell,
-            cell: (limit) => formatRateLimit(limit.rpm),
-          },
-          {
-            id: 'tpm',
-            header: 'TPM',
-            className: 'h-9 text-right',
-            cellClassName: tableStyles.topNumericCell,
-            cell: (limit) => formatRateLimit(limit.tpm),
-          },
-          {
-            id: 'rpd',
-            header: 'RPD',
-            className: 'h-9 text-right',
-            cellClassName: tableStyles.topNumericCell,
-            cell: (limit) => formatRateLimit(limit.rpd),
-          },
-        ]}
-      />
-      <p className='text-muted-foreground mt-2 text-[11px] leading-relaxed'>
-        {t(
-          'RPM = requests per minute, TPM = tokens per minute, RPD = requests per day. Limits apply per token group.'
-        )}
-      </p>
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Authentication preview
 // ---------------------------------------------------------------------------
 
@@ -772,19 +593,22 @@ export function ModelDetailsApi(props: {
 }) {
   const { t } = useTranslation()
   const ccgSeedance = isCcgSeedanceModel(props.model)
+  const nativeSeedance = isNativeSeedanceModel(props.model)
+  const endpointTypes = getModelEndpointTypes(props.model)
+  const commonChat =
+    endpointTypes.includes('openai') &&
+    !endpointTypes.includes('image-generation')
   return (
     <div className='space-y-6'>
       <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
       <AuthSection />
-      {ccgSeedance ? (
+      {ccgSeedance && (
         <a className='text-primary underline' href='/docs/videos'>
           {t('Video tasks')} · {t('Request parameters')}
         </a>
-      ) : (
-        <>
-          <SupportedParametersSection model={props.model} />
-          <RateLimitsSection model={props.model} />
-        </>
+      )}
+      {!ccgSeedance && !nativeSeedance && commonChat && (
+        <SupportedParametersSection model={props.model} />
       )}
     </div>
   )

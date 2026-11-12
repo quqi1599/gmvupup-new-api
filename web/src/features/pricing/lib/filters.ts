@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { getCustomerModelSearchNames } from '@/features/gmvupup/customer-models'
+
 import {
   SORT_OPTIONS,
   FILTER_ALL,
@@ -53,7 +55,7 @@ export function filterBySearch(
   const lowerQuery = query.toLowerCase()
   return models.filter(
     (m) =>
-      m.model_name?.toLowerCase().includes(lowerQuery) ||
+      getCustomerModelSearchNames(m).toLowerCase().includes(lowerQuery) ||
       m.description?.toLowerCase().includes(lowerQuery) ||
       m.tags?.toLowerCase().includes(lowerQuery) ||
       m.vendor_name?.toLowerCase().includes(lowerQuery)

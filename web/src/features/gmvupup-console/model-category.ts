@@ -1,4 +1,3 @@
-import { isTokenBasedModel } from '@/features/pricing/lib/model-helpers'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,11 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { isNativeSeedanceModel } from '@/features/gmvupup/customer-models'
+import { isTokenBasedModel } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
 
 export function getModelCategory(model: PricingModel) {
   const endpoints = model.supported_endpoint_types ?? []
   if (
+    isNativeSeedanceModel(model) ||
     endpoints.some((type) => /video|sora/.test(type)) ||
     Object.values(model.billing_usage_schema ?? {}).some(
       (field) => field.unit === 'second'

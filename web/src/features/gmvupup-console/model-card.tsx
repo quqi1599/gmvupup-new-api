@@ -23,6 +23,10 @@ import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { GmvupupModelLogo } from '@/features/gmvupup/components/model-logo'
+import {
+  getCustomerModelName,
+  getCustomerModelDescriptionKey,
+} from '@/features/gmvupup/customer-models'
 import { useBillingTime } from '@/features/pricing/hooks/use-billing-time'
 import type { ParsedTaskTier } from '@/features/pricing/lib/billing-expr'
 import { formatBillingCondition } from '@/features/pricing/lib/billing-expression/condition-display'
@@ -184,6 +188,7 @@ export function ConsoleModelCard(props: {
       ]
     }
   }
+  const descriptionKey = getCustomerModelDescriptionKey(props.model)
   const lines = (props.model.description ?? '')
     .split('\n')
     .map((line) => line.trim())
@@ -208,7 +213,7 @@ export function ConsoleModelCard(props: {
           />
         </span>
         <div>
-          <h2>{props.model.model_name}</h2>
+          <h2>{getCustomerModelName(props.model)}</h2>
           <div className='gmvc-model-tags'>
             <span>{typeLabel}</span>
             <span>
@@ -268,7 +273,9 @@ export function ConsoleModelCard(props: {
         )}
       </div>
       <p className='gmvc-model-description'>
-        {description || t('No description available.')}
+        {descriptionKey
+          ? t(descriptionKey)
+          : description || t('No description available.')}
       </p>
     </Card>
   )

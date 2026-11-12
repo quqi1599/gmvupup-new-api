@@ -24,6 +24,10 @@ import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { GmvupupModelLogo } from '@/features/gmvupup/components/model-logo'
+import {
+  getCustomerModelName,
+  getCustomerModelDescriptionKey,
+} from '@/features/gmvupup/customer-models'
 import { cn } from '@/lib/utils'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
@@ -68,6 +72,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const showRechargePrice = props.showRechargePrice ?? false
   const isTokenBased = isTokenBasedModel(props.model)
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
+  const descriptionKey = getCustomerModelDescriptionKey(props.model)
   const tags = parseTags(props.model.tags)
   const groups = props.model.enable_groups || []
   const endpoints = props.model.supported_endpoint_types || []
@@ -274,16 +279,16 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       <CardHeader className='flex flex-row items-start gap-3'>
         <div className='bg-muted/50 flex size-10 shrink-0 items-center justify-center rounded-lg'>
           <GmvupupModelLogo
-            modelName={props.model.model_name}
+            modelName={getCustomerModelName(props.model)}
             icon={props.model.icon || props.model.vendor_icon}
           />
         </div>
         <div className='min-w-0 flex-1'>
           <h3
             className='line-clamp-2 font-mono text-[15px] leading-snug font-semibold [overflow-wrap:anywhere]'
-            title={props.model.model_name}
+            title={getCustomerModelName(props.model)}
           >
-            {props.model.model_name}
+            {getCustomerModelName(props.model)}
           </h3>
           {props.model.vendor_name && (
             <p
@@ -295,7 +300,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           )}
         </div>
         <CopyButton
-          value={props.model.model_name}
+          value={getCustomerModelName(props.model)}
           tooltip={t('Copy model name')}
           className='size-7'
           iconClassName='size-3.5'
@@ -304,7 +309,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       <CardContent className='flex flex-1 flex-col gap-3'>
         <div className='flex min-w-0 flex-col gap-1.5'>
           <p className='text-muted-foreground line-clamp-2 text-[13px] leading-5 break-words'>
-            {props.model.description || t('No description available.')}
+            {descriptionKey
+              ? t(descriptionKey)
+              : props.model.description || t('No description available.')}
           </p>
           {tags.length > 0 && (
             <div

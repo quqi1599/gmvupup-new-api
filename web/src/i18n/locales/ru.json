@@ -7707,7 +7707,10 @@
     "The rate is per output second at the selected resolution, including requests with reference media. A failed task returns its reserved GMVUPUP quota.": "The rate is per output second at the selected resolution, including requests with reference media. A failed task returns its reserved GMVUPUP quota.",
     "Current video pricing": "Current video pricing",
     "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.": "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.",
-    "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens."
+    "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
+    "Prices include the billing unit for each model": "Prices include the billing unit for each model",
+    "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.",
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input."
   },
   "ZPay / Epay Gateway": "Шлюз ZPay / Epay",
   "Use ZPay gateway": "Использовать шлюз ZPay",
