@@ -42,10 +42,15 @@ const native: PricingModel = {
 
 describe('customer Seedance product selection', () => {
   it('keeps a public short ID on the native protocol when that ID is bound to Doubao', () => {
-    const publicNative = {
+    const publicNative: PricingModel = {
       ...legacy,
       billing_plugin_variants: [
-        { plugin_key: 'doubao', plugin_name: 'Doubao' },
+        {
+          plugin_key: 'doubao',
+          plugin_name: 'Doubao',
+          billing_expr: 'tier("base", u("tokens") * 0.000001)',
+          billing_usage_schema: { tokens: { type: 'number', unit: 'token' } },
+        },
       ],
     }
     expect(isNativeSeedanceModel(publicNative)).toBe(true)
