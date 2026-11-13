@@ -53,6 +53,18 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *
 	channel.SetupApiRequestHeader(info, c, header)
 	header.Set("Authorization", "Bearer "+info.ApiKey)
 	header.Set("Content-Type", "application/json")
+	if strings.EqualFold(strings.TrimSpace(c.GetHeader("TypeSafe-Danger-Zone-Long-Context")), "true") {
+		header.Set("TypeSafe-Danger-Zone-Long-Context", "true")
+	}
+	if a.request != nil {
+		images := len(a.request.Assets) > 0
+		for _, q := range a.request.Questions {
+			images = images || q.Type == "box"
+		}
+		if images {
+			header.Set("TypeSafe-Danger-Zone-Images", "true")
+		}
+	}
 	return nil
 }
 
@@ -119,6 +131,12 @@ func (a *Adaptor) validResponse(result *dto.DecisionsResponse) bool {
 			Confidence    *float64            `json:"confidence"`
 			Probabilities map[string]*float64 `json:"probabilities"`
 			Legend        map[string]*string  `json:"legend"`
+			Box           *struct {
+				Top    *float64 `json:"top"`
+				Bottom *float64 `json:"bottom"`
+				Left   *float64 `json:"left"`
+				Right  *float64 `json:"right"`
+			} `json:"box"`
 		}
 		if common.Unmarshal(result.Answers[id], &answer) != nil || answer.Type != question.Type {
 			return false
@@ -128,6 +146,18 @@ func (a *Adaptor) validResponse(result *dto.DecisionsResponse) bool {
 			if answer.Noul == nil || *answer.Noul < 0 || *answer.Noul > 1 {
 				return false
 			}
+		case "box":
+			if answer.Box == nil || answer.Confidence == nil || *answer.Confidence < 0 || *answer.Confidence > 1 {
+				return false
+			}
+			b := answer.Box
+			if b.Top == nil || b.Bottom == nil || b.Left == nil || b.Right == nil {
+				return false
+			}
+			if *b.Top < 0 || *b.Bottom > 1 || *b.Left < 0 || *b.Right > 1 || *b.Top > *b.Bottom || *b.Left > *b.Right {
+				return false
+			}
+			continue
 		case "choice":
 			var criteria map[string]json.RawMessage
 			if answer.Choice == nil || common.Unmarshal(question.Criteria, &criteria) != nil {
@@ -181,7 +211,9 @@ func (a *Adaptor) validResponse(result *dto.DecisionsResponse) bool {
 }
 
 // GetModelList returns the built-in Jev model names for channel configuration.
-func (a *Adaptor) GetModelList() []string { return []string{"jev-1.13.0", "jev-latest", "jev-preview"} }
+func (a *Adaptor) GetModelList() []string {
+	return []string{"jev-1.14.0", "jev-1.13.0", "jev-latest", "jev-preview"}
+}
 
 // GetChannelName identifies the TypeSafe provider in the shared adaptor interface.
 func (a *Adaptor) GetChannelName() string { return "typesafe" }

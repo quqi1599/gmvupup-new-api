@@ -2,6 +2,7 @@ package relay
 
 import (
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
@@ -82,7 +83,16 @@ func DecisionsHelper(c *gin.Context, info *relaycommon.RelayInfo) (resultErr *ty
 	}
 	statusMapping := c.GetString("status_code_mapping")
 	if httpResponse.StatusCode != http.StatusOK {
-		apiErr := service.RelayErrorHandler(c.Request.Context(), httpResponse, false)
+		data, readErr := io.ReadAll(io.LimitReader(httpResponse.Body, (1<<20)+1))
+		httpResponse.Body.Close()
+		if readErr != nil || len(data) > 1<<20 {
+			return types.NewErrorWithStatusCode(errors.New("failed to read TypeSafe error"), types.ErrorCodeBadResponseBody, http.StatusBadGateway)
+		}
+		var vendorError map[string]any
+		if common.Unmarshal(data, &vendorError) == nil && vendorError["detail"] != nil {
+			c.Set("decisions_upstream_error", data)
+		}
+		apiErr := types.NewErrorWithStatusCode(errors.New("TypeSafe rejected the decisions request"), types.ErrorCodeBadResponseStatusCode, httpResponse.StatusCode)
 		service.ResetStatusCode(apiErr, statusMapping)
 		return apiErr
 	}

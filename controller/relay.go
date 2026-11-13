@@ -205,6 +205,17 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	if decisions, ok := request.(*dto.DecisionsRequest); ok && len(decisions.Assets) > 0 {
+		// Image tokens use TypeSafe's proprietary tokenizer. Reserve the full
+		// advertised budget, then settle only validated upstream input usage.
+		budget := 65792
+		if strings.EqualFold(strings.TrimSpace(c.GetHeader("TypeSafe-Danger-Zone-Long-Context")), "true") {
+			budget = 262400
+		}
+		if tokens < budget {
+			tokens = budget
+		}
+	}
 	relayInfo.SetEstimatePromptTokens(tokens)
 
 	var priceData types.PriceData
@@ -541,6 +552,12 @@ func writeRelayError(c *gin.Context, ws *websocket.Conn, relayFormat types.Relay
 		c.Header("Retry-After", authUnavailableRetryAfterSeconds)
 	}
 
+	if relayFormat == types.RelayFormatDecisions {
+		if raw, ok := c.Get("decisions_upstream_error"); ok {
+			c.Data(relayErr.StatusCode, "application/json", raw.([]byte))
+			return
+		}
+	}
 	switch relayFormat {
 	case types.RelayFormatClaude:
 		c.JSON(relayErr.StatusCode, gin.H{

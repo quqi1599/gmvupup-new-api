@@ -58,7 +58,7 @@ func TestJevRelay(t *testing.T) {
 		{name: "boolean state", request: strings.Replace(jevRequest, `{"ticket":"Payment failed. Help today."}`, `false`, 1), expectedStatus: 400},
 		{name: "unknown question type", request: strings.Replace(jevRequest, `"type":"noul"`, `"type":"chat"`, 1), expectedStatus: 400},
 		{name: "invalid choice criteria", request: strings.Replace(jevRequest, `"billing":null`, `"billing":3`, 1), expectedStatus: 400},
-		{name: "single score level", request: strings.Replace(jevRequest, `["Low","Medium","High"]`, `["Low"]`, 1), expectedStatus: 400},
+		{name: "empty score levels", request: strings.Replace(jevRequest, `["Low","Medium","High"]`, `[]`, 1), expectedStatus: 400},
 		{name: "duplicate model rejected", request: strings.Replace(jevRequest, `"model":`, `"model":"other","model":`, 1), expectedStatus: 400},
 		{name: "upstream authentication", upstreamStatus: 401, response: `{"detail":"Unauthorized"}`, expectedStatus: 401, wantUpstream: true},
 		{name: "upstream validation", upstreamStatus: 422, response: `{"detail":"Invalid request"}`, expectedStatus: 422, wantUpstream: true},

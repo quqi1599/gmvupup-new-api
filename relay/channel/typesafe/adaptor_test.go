@@ -1,6 +1,7 @@
 package typesafe
 
 import (
+	"github.com/QuantumNous/new-api/common"
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
@@ -28,5 +29,14 @@ func TestDecisionsUpstreamPath(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
 		}
+	}
+}
+
+func TestDecisionsBoxBounds(t *testing.T) {
+	for _, box := range []string{`{"top":0,"bottom":1,"left":0,"right":1}`, `{"top":0.8,"bottom":0.2,"left":0,"right":1}`, `{"top":0,"bottom":1,"left":0}`, `{"top":0,"bottom":1,"left":0,"right":2}`} {
+		a := &Adaptor{request: &dto.DecisionsRequest{Questions: map[string]dto.DecisionsQuestion{"q": {Type: "box"}}}}
+		var response dto.DecisionsResponse
+		require.NoError(t, common.Unmarshal([]byte(`{"model":"jev-1.14.0","answers":{"q":{"type":"box","confidence":0,"box":`+box+`}},"usage":{"input_tokens":80274,"output_tokens":0}}`), &response))
+		require.Equal(t, box == `{"top":0,"bottom":1,"left":0,"right":1}`, a.validResponse(&response))
 	}
 }

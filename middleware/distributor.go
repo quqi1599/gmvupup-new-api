@@ -311,6 +311,16 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	var modelRequest ModelRequest
 	shouldSelectChannel := true
 	var err error
+	if c.Request.URL.Path == "/v1/decisions" || c.Request.URL.Path == "/v1/systemone" || c.Request.URL.Path == "/typesafe/v1/systemone" {
+		data, bodyErr := common.DecisionsBody(c)
+		if bodyErr != nil {
+			return nil, false, bodyErr
+		}
+		if err = common.Unmarshal(data, &modelRequest); err != nil {
+			return nil, false, err
+		}
+		return &modelRequest, true, nil
+	}
 	if strings.Contains(c.Request.URL.Path, "/mj/") {
 		relayMode := relayconstant.Path2RelayModeMidjourney(c.Request.URL.Path)
 		if relayMode == relayconstant.RelayModeMidjourneyTaskFetch ||

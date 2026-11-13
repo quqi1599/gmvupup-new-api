@@ -25,7 +25,7 @@ func TestDecisionsCriteriaBounds(t *testing.T) {
 		kind  string
 		count int
 		valid bool
-	}{{"choice", 0, false}, {"choice", 255, true}, {"choice", 256, false}, {"score", 1, false}, {"score", 2, true}, {"score", 10, true}, {"score", 11, false}} {
+	}{{"choice", 0, false}, {"choice", 255, true}, {"choice", 256, false}, {"score", 1, true}, {"score", 2, true}, {"score", 10, true}, {"score", 11, false}} {
 		var criteria any
 		if tc.kind == "choice" {
 			options := map[string]any{}
@@ -45,5 +45,19 @@ func TestDecisionsCriteriaBounds(t *testing.T) {
 		} else {
 			require.Error(t, request.Validate())
 		}
+	}
+}
+
+func TestDecisions114RejectsUnsupportedInputs(t *testing.T) {
+	for _, input := range []string{
+		`{"model":"jev-latest","state":"x","questions":{"q":{"type":"box"}},"messages":[]}`,
+		`{"model":"jev-latest","state":"x","questions":{"q":{"type":"box"}},"assets":{"a":{"type":"image","format":"png","data_base64":"not-base64"}}}`,
+	} {
+		var request DecisionsRequest
+		err := common.Unmarshal([]byte(input), &request)
+		if err == nil {
+			err = request.Validate()
+		}
+		require.Error(t, err)
 	}
 }

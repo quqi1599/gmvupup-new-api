@@ -51,11 +51,7 @@ func GetAndValidateRequest(c *gin.Context, format types.RelayFormat) (request dt
 		request, err = GetAndValidateEmbeddingRequest(c, relayMode)
 	case types.RelayFormatDecisions:
 		decisions := &dto.DecisionsRequest{}
-		storage, bodyErr := common.GetBodyStorage(c)
-		if bodyErr != nil {
-			return nil, bodyErr
-		}
-		data, bodyErr := storage.Bytes()
+		data, bodyErr := common.DecisionsBody(c)
 		if bodyErr != nil {
 			return nil, bodyErr
 		}
@@ -72,7 +68,7 @@ func GetAndValidateRequest(c *gin.Context, format types.RelayFormat) (request dt
 		if duplicate {
 			return nil, errors.New("duplicate decisions request field")
 		}
-		if err = common.UnmarshalBodyReusable(c, decisions); err == nil {
+		if err = common.Unmarshal(data, decisions); err == nil {
 			err = decisions.Validate()
 		}
 		request = decisions

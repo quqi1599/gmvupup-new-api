@@ -1,9 +1,14 @@
 package dto
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -16,7 +21,32 @@ type DecisionsRequest struct {
 	Model     string                       `json:"model"`
 	State     json.RawMessage              `json:"state"`
 	Questions map[string]DecisionsQuestion `json:"questions"`
+	Assets    map[string]DecisionsAsset    `json:"assets,omitempty"`
 	Stream    *bool                        `json:"stream,omitempty"`
+}
+
+type DecisionsAsset struct {
+	Type       string `json:"type"`
+	Format     string `json:"format,omitempty"`
+	DataBase64 string `json:"data_base64,omitempty"`
+	Part       string `json:"part,omitempty"`
+}
+
+// UnmarshalJSON rejects unknown top-level fields rather than dropping them.
+func (r *DecisionsRequest) UnmarshalJSON(data []byte) error {
+	type plain DecisionsRequest
+	var fields map[string]json.RawMessage
+	if err := common.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for k := range fields {
+		switch k {
+		case "model", "state", "questions", "assets", "stream":
+		default:
+			return errors.New("unsupported decisions request field: " + k)
+		}
+	}
+	return common.DecodeJson(bytes.NewReader(data), (*plain)(r))
 }
 
 type DecisionsQuestion struct {
@@ -58,15 +88,31 @@ func (r *DecisionsRequest) Validate() error {
 	if len(r.Questions) == 0 {
 		return errors.New("questions must not be empty")
 	}
+	for _, asset := range r.Assets {
+		if asset.Type != "image" || asset.Part != "" || asset.DataBase64 == "" {
+			return errors.New("image asset requires inline image data")
+		}
+		data, decodeErr := base64.StdEncoding.DecodeString(asset.DataBase64)
+		if decodeErr != nil || len(data) > 20<<20 {
+			return errors.New("invalid or oversized base64 image")
+		}
+		cfg, format, imageErr := image.DecodeConfig(bytes.NewReader(data))
+		if imageErr != nil || cfg.Width < 1 || cfg.Height < 1 || (format != "png" && format != "jpeg") {
+			return errors.New("invalid PNG or JPEG image")
+		}
+		if asset.Format != "png" && asset.Format != "jpg" && asset.Format != "jpeg" {
+			return errors.New("image format must be png or jpeg")
+		}
+	}
 	for _, q := range r.Questions {
 		switch common.GetJsonType(q.Instructions) {
-		case "string", "object", "array":
+		case "string", "object", "array", "null", "unknown":
 		default:
 			return errors.New("question instructions must be a string, object or array")
 		}
 		switch q.Type {
 		case "noul":
-			if len(q.Criteria) == 0 {
+			if len(q.Criteria) == 0 || string(q.Criteria) == "null" {
 				continue
 			}
 			var criteria map[string]json.RawMessage
@@ -75,9 +121,9 @@ func (r *DecisionsRequest) Validate() error {
 			}
 			for key, value := range criteria {
 				if key != "true" && key != "false" {
-					return errors.New("noul criteria keys must be true or false")
+					continue
 				}
-				if !validDecisionDescription(value, false) {
+				if !validDecisionDescription(value, true) {
 					return errors.New("noul criteria descriptions must be strings, objects or arrays")
 				}
 			}
@@ -93,16 +139,17 @@ func (r *DecisionsRequest) Validate() error {
 			}
 		case "score":
 			var criteria []json.RawMessage
-			if common.Unmarshal(q.Criteria, &criteria) != nil || len(criteria) < 2 || len(criteria) > 10 {
-				return errors.New("score criteria must contain 2 to 10 levels")
+			if common.Unmarshal(q.Criteria, &criteria) != nil || len(criteria) < 1 || len(criteria) > 10 {
+				return errors.New("score criteria must contain 1 to 10 levels")
 			}
 			for _, value := range criteria {
 				if !validDecisionDescription(value, false) {
 					return errors.New("invalid score level")
 				}
 			}
+		case "box":
 		default:
-			return errors.New("unsupported question type; expected noul, choice or score")
+			return errors.New("unsupported question type; expected noul, choice, score or box")
 		}
 	}
 	return nil
