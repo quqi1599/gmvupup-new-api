@@ -26,10 +26,10 @@ type DecisionsRequest struct {
 }
 
 type DecisionsAsset struct {
-	Type       string `json:"type"`
-	Format     string `json:"format,omitempty"`
-	DataBase64 string `json:"data_base64,omitempty"`
-	Part       string `json:"part,omitempty"`
+	Type       string  `json:"type"`
+	Format     *string `json:"format,omitempty"`
+	DataBase64 *string `json:"data_base64,omitempty"`
+	Part       *string `json:"part,omitempty"`
 }
 
 // UnmarshalJSON rejects unknown top-level fields rather than dropping them.
@@ -89,10 +89,10 @@ func (r *DecisionsRequest) Validate() error {
 		return errors.New("questions must not be empty")
 	}
 	for _, asset := range r.Assets {
-		if asset.Type != "image" || asset.Part != "" || asset.DataBase64 == "" {
+		if asset.Type != "image" || asset.Part != nil || asset.DataBase64 == nil || asset.Format == nil || *asset.DataBase64 == "" {
 			return errors.New("image asset requires inline image data")
 		}
-		data, decodeErr := base64.StdEncoding.DecodeString(asset.DataBase64)
+		data, decodeErr := base64.StdEncoding.DecodeString(*asset.DataBase64)
 		if decodeErr != nil || len(data) > 20<<20 {
 			return errors.New("invalid or oversized base64 image")
 		}
@@ -100,7 +100,7 @@ func (r *DecisionsRequest) Validate() error {
 		if imageErr != nil || cfg.Width < 1 || cfg.Height < 1 || (format != "png" && format != "jpeg") {
 			return errors.New("invalid PNG or JPEG image")
 		}
-		if asset.Format != "png" && asset.Format != "jpg" && asset.Format != "jpeg" {
+		if *asset.Format != "png" && *asset.Format != "jpg" && *asset.Format != "jpeg" {
 			return errors.New("image format must be png or jpeg")
 		}
 	}

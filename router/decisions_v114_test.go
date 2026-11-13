@@ -26,9 +26,10 @@ func TestJev114ImagesAndSDK(t *testing.T) {
 			_, token := setupJevRelayTest(t)
 			var picture bytes.Buffer
 			require.NoError(t, png.Encode(&picture, image.NewRGBA(image.Rect(0, 0, 32, 32))))
-			asset := dto.DecisionsAsset{Type: "image", Format: "png", DataBase64: base64.StdEncoding.EncodeToString(picture.Bytes())}
+			format, encoded, part := "png", base64.StdEncoding.EncodeToString(picture.Bytes()), "photo"
+			asset := dto.DecisionsAsset{Type: "image", Format: &format, DataBase64: &encoded}
 			if multipartBody {
-				asset = dto.DecisionsAsset{Type: "image", Part: "photo"}
+				asset = dto.DecisionsAsset{Type: "image", Part: &part}
 			}
 			body := dto.DecisionsRequest{Model: "jev-latest", State: []byte(`{"photo":"image-ref","n":0,"count":false}`), Assets: map[string]dto.DecisionsAsset{"image-ref": asset}, Questions: map[string]dto.DecisionsQuestion{
 				"box":   {Type: "box", Instructions: []byte(`"Find the square"`)},
@@ -45,7 +46,7 @@ func TestJev114ImagesAndSDK(t *testing.T) {
 				require.Equal(t, "Bearer upstream-test-key", r.Header.Get("Authorization"))
 				var received dto.DecisionsRequest
 				require.NoError(t, common.DecodeJson(r.Body, &received))
-				require.Equal(t, base64.StdEncoding.EncodeToString(picture.Bytes()), received.Assets["image-ref"].DataBase64)
+				require.Equal(t, base64.StdEncoding.EncodeToString(picture.Bytes()), *received.Assets["image-ref"].DataBase64)
 				require.JSONEq(t, string(body.State), string(received.State))
 				w.Header().Set("Content-Type", "application/json")
 				io.WriteString(w, `{"model":"jev-1.14.0","answers":{"box":{"type":"box","box":{"top":0,"bottom":1,"left":0,"right":1},"confidence":0.9},"score":{"type":"score","score":0,"legend":{"0":"one"},"probabilities":{"0":1},"confidence":1},"noul":{"type":"noul","noul":0}},"usage":{"input_tokens":80274,"output_tokens":21}}`)
