@@ -7710,7 +7710,12 @@
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
     "Prices include the billing unit for each model": "Prices include the billing unit for each model",
     "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.",
-    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input."
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.",
+    "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.": "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.",
+    "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.",
+    "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.",
+    "No reference video": "No reference video",
+    "With reference video": "With reference video"
   },
   "ZPay / Epay Gateway": "ZPay / Epay Gateway",
   "Use ZPay gateway": "Use ZPay gateway",

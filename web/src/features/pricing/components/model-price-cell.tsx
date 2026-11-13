@@ -33,7 +33,7 @@ import {
 import { getFixedPriceUnit, isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import {
-  getVideoResolutionPrices,
+  getVideoSecondPricing,
   taskUsageUnitLabel,
 } from '../lib/task-price-display'
 import type { PricingModel, TokenUnit } from '../types'
@@ -99,7 +99,7 @@ export function ModelPriceCell(props: {
     unit: tokenUnitLabel,
   })
 
-  const resolutionPrices = getVideoResolutionPrices(props.model, {
+  const videoPricing = getVideoSecondPricing(props.model, {
     ...options,
     tokenUnit,
     showCurrencySymbol: true,
@@ -108,7 +108,7 @@ export function ModelPriceCell(props: {
       options.selectedGroup
     ),
   })
-  if (resolutionPrices) return <VideoResolutionPrices rows={resolutionPrices} />
+  if (videoPricing) return <VideoResolutionPrices {...videoPricing} />
   if (dynamic) {
     if (dynamic.isSpecialExpression) {
       return (

@@ -7710,7 +7710,12 @@
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
     "Prices include the billing unit for each model": "Prices include the billing unit for each model",
     "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.",
-    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input."
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.",
+    "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.": "16:9・24fpsでの目安です。参考動画がある場合は入力と出力の合計時間が対象となり、最低料金が適用される場合があります。実際の仕様により料金が変わります。",
+    "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "参考動画なし、16:9・24fpsでの目安です。参考動画ありの料金は詳細をご確認ください。",
+    "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "入力動画も同じ秒単価です。参考画像は最初の5枚まで無料、追加は1枚{{price}}です。",
+    "No reference video": "参考動画なし",
+    "With reference video": "参考動画あり"
   },
   "ZPay / Epay Gateway": "ZPay / Epay ゲートウェイ",
   "Use ZPay gateway": "ZPay ゲートウェイを使用",

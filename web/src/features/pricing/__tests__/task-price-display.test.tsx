@@ -20,8 +20,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, cleanup, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 
+import zhLocale from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import {
   DEFAULT_CURRENCY_CONFIG,
@@ -35,12 +36,200 @@ import { ModelPriceCell } from '../components/model-price-cell'
 import { getTaskPricingDisplayTiers } from '../lib/task-matrix-display'
 import {
   hasSimpleTaskPricing,
+  getVideoSecondPricing,
   taskPriceLabel,
   taskEnumLabel,
   taskPricingConditions,
   taskUsageUnitLabel,
 } from '../lib/task-price-display'
 import type { PricingModel, BillingUsageSchema } from '../types'
+
+const seedanceSecondPriceModel: PricingModel = {
+  id: 91,
+  model_name: 'doubao-seedance-2.5',
+  quota_type: 0,
+  model_ratio: 1,
+  completion_ratio: 1,
+  enable_groups: ['default', 'vip'],
+  group_ratio: { default: 1, vip: 2 },
+  billing_plugin_variants: [
+    {
+      plugin_key: 'doubao',
+      plugin_name: 'Doubao',
+      billing_mode: 'tiered_expr',
+      billing_expr:
+        'u("resolution") == "1080p" ? (u("video_input") == "video" ? tier("1080-video", u("tokens") * 36.8 / 7.3 / 1000000) : tier("1080-none", u("tokens") * 61.6 / 7.3 / 1000000)) : (u("video_input") == "video" ? tier("video", u("tokens") * 33.6 / 7.3 / 1000000) : tier("none", u("tokens") * 56 / 7.3 / 1000000))',
+      billing_usage_schema: {
+        tokens: { type: 'number', unit: 'token' },
+        resolution: { enum: ['480p', '720p', '1080p'] },
+        video_input: { enum: ['none', 'video'] },
+      },
+    },
+  ],
+}
+
+it('shows Seedance second estimates across cards, cells and details while retaining reference-video and group prices', async () => {
+  i18next.addResourceBundle('zhCN', 'translation', zhLocale.translation)
+  onTestFinished(() => {
+    i18next.removeResourceBundle('zhCN', 'translation')
+  })
+  const previous = useSystemConfigStore.getState().config.currency
+  onTestFinished(() =>
+    useSystemConfigStore.getState().setConfig({ currency: previous })
+  )
+  useSystemConfigStore.getState().setConfig({
+    currency: {
+      ...DEFAULT_CURRENCY_CONFIG,
+      quotaDisplayType: 'CNY',
+      usdExchangeRate: 7.3,
+    },
+  })
+  vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { groups: [] } } })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  const before = JSON.stringify(seedanceSecondPriceModel)
+  render(
+    <QueryClientProvider client={client}>
+      <div data-testid='second-card'>
+        <ModelCard
+          model={seedanceSecondPriceModel}
+          tokenUnit='K'
+          onClick={vi.fn()}
+        />
+      </div>
+      <div data-testid='second-cell'>
+        <ModelPriceCell
+          model={seedanceSecondPriceModel}
+          options={{ tokenUnit: 'M' }}
+        />
+      </div>
+      <div data-testid='second-details'>
+        <ModelDetailsContent
+          model={seedanceSecondPriceModel}
+          groupRatio={{ default: 1, vip: 2 }}
+          usableGroup={{
+            default: { desc: '', ratio: 1 },
+            vip: { desc: '', ratio: 2 },
+          }}
+          endpointMap={{}}
+          autoGroups={[]}
+          priceRate={7.3}
+          usdExchangeRate={7.3}
+          tokenUnit='K'
+        />
+      </div>
+    </QueryClientProvider>
+  )
+  for (const section of ['second-card', 'second-cell', 'second-details']) {
+    const scope = within(screen.getByTestId(section))
+    expect(scope.getAllByText('¥0.53802').length).toBeGreaterThan(0)
+    expect(scope.getAllByText('¥1.2096').length).toBeGreaterThan(0)
+    expect(
+      scope.queryByText(/1M token|Billing token unit price/i)
+    ).not.toBeInTheDocument()
+    expect(scope.getAllByText(/16:9.*24.*fps/i).length).toBeGreaterThan(0)
+  }
+  const details = within(screen.getByTestId('second-details'))
+  expect(details.getAllByText('¥0.72576').length).toBeGreaterThan(0)
+  expect(details.getByText('¥2.4192')).toBeVisible()
+  await act(() => i18next.changeLanguage('zhCN'))
+  expect(details.getAllByText('有参考视频').length).toBeGreaterThan(0)
+  expect(details.getAllByText(/按16:9、24fps估算/).length).toBeGreaterThan(0)
+  expect(screen.getByTestId('second-details')).not.toHaveTextContent(/Token/i)
+  expect(JSON.stringify(seedanceSecondPriceModel)).toBe(before)
+})
+
+it('uses the Seedance 2.0 480p dimensions and 4K tier without scaling seconds by the token-unit selector', () => {
+  const variant = seedanceSecondPriceModel.billing_plugin_variants?.[0]
+  if (!variant) throw new Error('Seedance fixture needs a Doubao variant')
+  const seedance20: PricingModel = {
+    ...seedanceSecondPriceModel,
+    model_name: 'doubao-seedance-2.0',
+    billing_plugin_variants: [
+      {
+        ...variant,
+        billing_expr:
+          'u("resolution") == "4k" ? (u("video_input") == "video" ? tier("4k-video", u("tokens") * 12.8 / 1000000) : tier("4k-none", u("tokens") * 20.8 / 1000000)) : (u("video_input") == "video" ? tier("video", u("tokens") * 22.4 / 1000000) : tier("none", u("tokens") * 36.8 / 1000000))',
+        billing_usage_schema: {
+          ...variant.billing_usage_schema,
+          resolution: { enum: ['480p', '720p', '4k'] },
+        },
+      },
+    ],
+  }
+  const million = getVideoSecondPricing(seedance20, { tokenUnit: 'M' })
+  expect(million?.rows[0]).toEqual({
+    resolution: '480p',
+    price: '$0.369619',
+    referencePrice: '$0.224986',
+  })
+  expect(million?.rows[2]).toEqual({
+    resolution: '4k',
+    price: '$4.0435',
+    referencePrice: '$2.4883',
+  })
+  expect(getVideoSecondPricing(seedance20, { tokenUnit: 'K' })).toEqual(million)
+  expect(
+    getVideoSecondPricing(seedance20, {
+      tokenUnit: 'K',
+      groupRatioMultiplier: 0,
+    })?.rows.every((row) => row.price === '$0' && row.referencePrice === '$0')
+  ).toBe(true)
+  expect(
+    getVideoSecondPricing(
+      {
+        ...seedance20,
+        billing_plugin_variants: [
+          {
+            ...variant,
+            billing_expr: 'tier("base", u("tokens") * 0.1 + 1)',
+          },
+        ],
+      },
+      { tokenUnit: 'M' }
+    )
+  ).toBeNull()
+})
+
+it('shows MiniMax H3 second prices with the input-video and extra-image charges', () => {
+  const previous = useSystemConfigStore.getState().config.currency
+  onTestFinished(() =>
+    useSystemConfigStore.getState().setConfig({ currency: previous })
+  )
+  useSystemConfigStore.getState().setConfig({
+    currency: {
+      ...DEFAULT_CURRENCY_CONFIG,
+      quotaDisplayType: 'CNY',
+      usdExchangeRate: 7.3,
+    },
+  })
+  const h3: PricingModel = {
+    ...seedanceSecondPriceModel,
+    model_name: 'MiniMax-H3',
+    billing_plugin_variants: [
+      {
+        plugin_key: 'hailuo',
+        plugin_name: 'Hailuo',
+        billing_mode: 'tiered_expr',
+        billing_expr:
+          'u("resolution") == "768P" ? tier("768P", (u("seconds") + u("input_video_seconds")) * 0.5 / 7.3 + max(u("input_images") - 5, 0) * 0.2 / 7.3) : tier("2K", (u("seconds") + u("input_video_seconds")) * 0.8 / 7.3 + max(u("input_images") - 5, 0) * 0.2 / 7.3)',
+        billing_usage_schema: {
+          resolution: { enum: ['768P', '2K'] },
+          seconds: { type: 'number', unit: 'second' },
+          input_video_seconds: { type: 'number', unit: 'second' },
+          input_images: { type: 'number', unit: 'count' },
+        },
+      },
+    ],
+  }
+  render(<ModelCard model={h3} onClick={vi.fn()} />)
+  expect(screen.getByText('¥0.5')).toBeVisible()
+  expect(screen.getByText('¥0.8')).toBeVisible()
+  expect(screen.getByText(/first 5 reference images.*¥0.2/)).toBeVisible()
+  expect(screen.queryByText('View details')).not.toBeInTheDocument()
+})
 
 vi.mock('@visactor/react-vchart', () => ({ VChart: () => null }))
 

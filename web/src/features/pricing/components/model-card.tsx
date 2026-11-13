@@ -44,7 +44,7 @@ import { parseTags } from '../lib/filters'
 import { getFixedPriceUnit, isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import {
-  getVideoResolutionPrices,
+  getVideoSecondPricing,
   taskPriceLabel,
   taskUsageUnitLabel,
 } from '../lib/task-price-display'
@@ -113,13 +113,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [props.model, dynamicPriceOptions, currency]
   )
-  const resolutionPrices = getVideoResolutionPrices(
-    props.model,
-    dynamicPriceOptions
-  )
+  const videoPricing = getVideoSecondPricing(props.model, dynamicPriceOptions)
   let priceSummary: ReactNode
-  if (resolutionPrices) {
-    priceSummary = <VideoResolutionPrices rows={resolutionPrices} />
+  if (videoPricing) {
+    priceSummary = <VideoResolutionPrices {...videoPricing} />
   } else if (dynamicSummary) {
     const cacheReadEntries = dynamicSummary.secondaryEntries.filter(
       (entry) => entry.field === 'cacheReadPrice' && entry.unit === 'token'

@@ -7710,7 +7710,12 @@
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
     "Prices include the billing unit for each model": "Prices include the billing unit for each model",
     "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.",
-    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input."
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.",
+    "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.": "Оценка для 16:9, 24 кадр/с. С референсным видео оплачивается суммарная длительность входа и выхода; возможна минимальная плата. Итог зависит от параметров видео.",
+    "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "Оценка для 16:9, 24 кадр/с, без референсного видео. Тариф с референсом указан в подробностях.",
+    "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "Входное видео оплачивается по тому же тарифу за секунду. Первые 5 референсных изображений бесплатны; каждое следующее стоит {{price}}.",
+    "No reference video": "Без референсного видео",
+    "With reference video": "С референсным видео"
   },
   "ZPay / Epay Gateway": "Шлюз ZPay / Epay",
   "Use ZPay gateway": "Использовать шлюз ZPay",

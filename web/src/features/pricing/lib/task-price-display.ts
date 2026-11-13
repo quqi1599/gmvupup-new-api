@@ -17,6 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
+  getCustomerModelName,
+  isNativeSeedanceModel,
+} from '@/features/gmvupup/customer-models'
+import {
   resolveLocalizedText,
   type LocalizedTextValue,
 } from '@/lib/localized-text'
@@ -33,13 +37,150 @@ import {
 } from './billing-expr'
 import { formatBillingCondition } from './billing-expression/condition-display'
 import { compileBillingExpression } from './billing-expression/parser'
+import { evaluateBillingExpression } from './billing-expression/runtime'
 import { visitExpression } from './billing-expression/types'
 import {
   getDynamicPricingSummary,
   getDynamicPriceEntries,
+  formatTaskUsageUnitPrice,
   type DynamicPriceOptions,
 } from './dynamic-price'
+import { withPluginPricing } from './plugin-pricing'
 import { getTaskPricingDisplayTiers } from './task-matrix-display'
+
+export type VideoSecondPricing = {
+  rows: { resolution: string; price: string; referencePrice?: string }[]
+  estimated?: boolean
+  extraImagePrice?: string
+}
+
+/** Display estimates only; the original expression and settlement units stay intact. */
+export function getVideoSecondPricing(
+  model: PricingModel,
+  options: DynamicPriceOptions
+): VideoSecondPricing | null {
+  const variants = model.billing_plugin_variants
+  const priced =
+    variants?.length === 1 ? withPluginPricing(model, variants[0]) : model
+  if (isNativeSeedanceModel(model)) {
+    const schema = priced.billing_usage_schema
+    const expression = splitBillingExprAndRequestRules(
+      priced.billing_expr || ''
+    )
+    if (expression.requestRuleExpr || schema?.tokens?.unit !== 'token') {
+      return null
+    }
+    const tiers = getTaskPricingDisplayTiers(expression.billingExpr, schema)
+    const resolutions = schema.resolution?.enum ?? []
+    if (
+      !tiers ||
+      tiers.length !== resolutions.length * 2 ||
+      !resolutions.length
+    ) {
+      return null
+    }
+    // Official 16:9 output sizes and 24 fps. 480p differs between 2.0 and 2.5.
+    // https://docs.volcengine.com/docs/ark/video-generation-tutorial?lang=zh
+    // https://docs.volcengine.com/docs/ark/model-pricing?lang=zh
+    const pixels: Record<string, number> = {
+      '480p':
+        getCustomerModelName(model) === 'Seedance 2.0' ? 864 * 496 : 854 * 480,
+      '720p': 1280 * 720,
+      '1080p': 1920 * 1080,
+      '4k': 3840 * 2160,
+    }
+    const rows: VideoSecondPricing['rows'] = []
+    for (const resolution of resolutions) {
+      if (!pixels[resolution]) return null
+      const prices: string[] = []
+      for (const input of ['none', 'video']) {
+        const matching = tiers.filter(
+          (tier) =>
+            tier.conditions.length === 2 &&
+            tier.conditions.every(
+              (condition) =>
+                (condition.field === 'resolution' &&
+                  condition.value === resolution) ||
+                (condition.field === 'video_input' && condition.value === input)
+            )
+        )
+        const tier = matching[0]
+        if (
+          matching.length !== 1 ||
+          tier.constant !== 0 ||
+          tier.conditionText ||
+          Object.keys(tier.unitPrices).some((key) => key !== 'tokens')
+        ) {
+          return null
+        }
+        const rate = tier.unitPrices.tokens
+        if (!Number.isFinite(rate) || rate < 0) return null
+        prices.push(
+          formatTaskUsageUnitPrice(
+            (rate * pixels[resolution] * 24) / 1024 / 1_000_000,
+            options
+          )
+        )
+      }
+      rows.push({ resolution, price: prices[0], referencePrice: prices[1] })
+    }
+    return { rows, estimated: true }
+  }
+  if (
+    model.model_name === 'MiniMax-H3' &&
+    variants?.length === 1 &&
+    variants[0].plugin_key === 'hailuo'
+  ) {
+    const compiled = compileBillingExpression(priced.billing_expr || '')
+    if (
+      compiled.status !== 'ready' ||
+      [...compiled.functions].some(
+        (name) => !['tier', 'u', 'max'].includes(name)
+      )
+    ) {
+      return null
+    }
+    const rows: VideoSecondPricing['rows'] = []
+    let extraImagePrice: string | undefined
+    for (const resolution of priced.billing_usage_schema?.resolution?.enum ??
+      []) {
+      const costs = [
+        { seconds: 1, input_video_seconds: 0, input_images: 0 },
+        { seconds: 2, input_video_seconds: 0, input_images: 5 },
+        { seconds: 0, input_video_seconds: 1, input_images: 0 },
+        { seconds: 1, input_video_seconds: 0, input_images: 6 },
+      ].map((facts) =>
+        evaluateBillingExpression(compiled, { usage: { ...facts, resolution } })
+      )
+      if (costs.some((cost) => cost.status !== 'success')) return null
+      const values = costs.map((cost) =>
+        cost.status === 'success' ? cost.cost : Number.NaN
+      )
+      if (
+        Math.abs(values[1] - values[0] * 2) > 1e-10 ||
+        Math.abs(values[2] - values[0]) > 1e-10 ||
+        values[3] < values[0]
+      ) {
+        return null
+      }
+      const imagePrice = formatTaskUsageUnitPrice(
+        values[3] - values[0],
+        options
+      )
+      if (extraImagePrice !== undefined && extraImagePrice !== imagePrice) {
+        return null
+      }
+      extraImagePrice = imagePrice
+      rows.push({
+        resolution,
+        price: formatTaskUsageUnitPrice(values[0], options),
+      })
+    }
+    return rows.length ? { rows, extraImagePrice } : null
+  }
+  const rows = getVideoResolutionPrices(model, options)
+  return rows ? { rows } : null
+}
 
 export function taskPriceLabel(
   description: LocalizedTextValue | undefined,

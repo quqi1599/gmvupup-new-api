@@ -7710,7 +7710,12 @@
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
     "Prices include the billing unit for each model": "Prices include the billing unit for each model",
     "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.",
-    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input."
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.",
+    "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.": "Ước tính ở 16:9, 24 fps. Khi có video tham chiếu, tính phí tổng thời lượng đầu vào và đầu ra, có thể áp dụng mức tối thiểu. Chi phí cuối cùng tùy thông số thực tế.",
+    "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "Ước tính ở 16:9, 24 fps, không có video tham chiếu. Xem chi tiết về giá có video tham chiếu.",
+    "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "Video đầu vào tính cùng đơn giá mỗi giây. 5 ảnh tham chiếu đầu tiên miễn phí; mỗi ảnh thêm có giá {{price}}.",
+    "No reference video": "Không có video tham chiếu",
+    "With reference video": "Có video tham chiếu"
   },
   "ZPay / Epay Gateway": "Cổng ZPay / Epay",
   "Use ZPay gateway": "Sử dụng cổng ZPay",

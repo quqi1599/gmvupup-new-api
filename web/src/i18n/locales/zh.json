@@ -7709,8 +7709,13 @@
     "Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.": "下表读取默认分组的实时价格。费用 = 输出时长 × 对应分辨率秒价；其他分组请在控制台核对。",
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "固定秒价参考中国区官方 16:9、无参考视频的每秒示例价 × 0.8，不按视频 Token 重算。",
     "Prices include the billing unit for each model": "各模型价格均标明计费单位",
-    "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "支持文字生视频、图片参考和视频编辑。按视频 Token 计费，价格随分辨率及是否使用参考视频而定。",
-    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "支持文字、图片和参考视频创作。按视频 Token 计费，价格随分辨率及是否使用参考视频而定。"
+    "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "支持文字生视频、图片参考和视频编辑。价格随分辨率及是否使用参考视频而定。",
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "支持文字、图片和参考视频创作。价格随分辨率及是否使用参考视频而定。",
+    "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.": "按16:9、24fps估算。使用参考视频时按输入和输出总时长计费，并可能有最低消费；实际费用随视频规格变化。",
+    "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "无参考视频，按16:9、24fps估算；参考视频价格见详情。",
+    "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "输入视频按相同秒价计费。前5张参考图片免费，超出部分每张{{price}}。",
+    "No reference video": "无参考视频",
+    "With reference video": "有参考视频"
   },
   "ZPay / Epay Gateway": "ZPay / 易支付网关",
   "Use ZPay gateway": "使用 ZPay 网关",

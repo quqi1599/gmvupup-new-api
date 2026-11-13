@@ -82,7 +82,11 @@ import {
   type DynamicPriceEntry,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
-import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
+import {
+  getAvailableGroups,
+  getConfiguredGroupRatio,
+  isTokenBasedModel,
+} from '../lib/model-helpers'
 import { withPluginPricing } from '../lib/plugin-pricing'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
 import {
@@ -93,6 +97,7 @@ import {
 import { getTaskPricingDisplayTiers } from '../lib/task-matrix-display'
 import {
   hasSimpleTaskPricing,
+  getVideoSecondPricing,
   taskPriceLabel,
   taskUsageUnitLabel,
   taskTierConditions,
@@ -108,6 +113,7 @@ import { DynamicPricingBreakdown } from './dynamic-pricing-breakdown'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelDetailsApi } from './model-details-api'
 import { ModelDetailsPerformance } from './model-details-performance'
+import { VideoResolutionPrices } from './video-resolution-prices'
 
 // ----------------------------------------------------------------------------
 // Local UI helpers
@@ -1006,6 +1012,43 @@ type GroupPricingSectionProps = {
 
 function GroupPricingSection(props: GroupPricingSectionProps) {
   const { t } = useTranslation()
+  const videoPriceOptions = {
+    tokenUnit: props.tokenUnit,
+    showRechargePrice: props.showRechargePrice,
+    priceRate: props.priceRate,
+    usdExchangeRate: props.usdExchangeRate,
+  }
+  if (getVideoSecondPricing(props.model, videoPriceOptions)) {
+    const groups = getAvailableGroups(props.model, props.usableGroup || {})
+    return (
+      <section>
+        <SectionTitle>{t('Pricing by Group')}</SectionTitle>
+        <div className='grid gap-4 sm:grid-cols-2'>
+          {groups.map((group) => {
+            const pricing = getVideoSecondPricing(props.model, {
+              ...videoPriceOptions,
+              groupRatioMultiplier: getConfiguredGroupRatio(
+                props.groupRatio,
+                group
+              ),
+            })
+            return (
+              pricing && (
+                <div
+                  key={group}
+                  className='min-w-0 space-y-3 rounded-lg border p-3'
+                >
+                  <h3 className='text-sm font-medium'>{group}</h3>
+                  <VideoResolutionPrices {...pricing} showReference />
+                </div>
+              )
+            )
+          })}
+        </div>
+        <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+      </section>
+    )
+  }
   const variants = props.model.billing_plugin_variants
   if (!variants?.length) {
     return <ProviderGroupPricingSection {...props} />
@@ -1478,6 +1521,13 @@ export interface ModelDetailsContentProps {
 export function ModelDetailsContent(props: ModelDetailsContentProps) {
   const { t } = useTranslation()
   const showRechargePrice = props.showRechargePrice ?? false
+  const videoPricing = getVideoSecondPricing(props.model, {
+    tokenUnit: props.tokenUnit,
+    showRechargePrice,
+    priceRate: props.priceRate,
+    usdExchangeRate: props.usdExchangeRate,
+    groupRatioMultiplier: 1,
+  })
 
   const isDynamic =
     props.model.billing_mode === 'tiered_expr' &&
@@ -1519,7 +1569,10 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
 
           <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-sm'>
             <SectionTitle>{t('Pricing')}</SectionTitle>
-            {showBasePrices && (
+            {videoPricing && (
+              <VideoResolutionPrices {...videoPricing} showReference />
+            )}
+            {!videoPricing && showBasePrices && (
               <PriceSection
                 model={props.model}
                 priceRate={props.priceRate}
@@ -1528,7 +1581,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
                 showRechargePrice={showRechargePrice}
               />
             )}
-            {isDynamic && !simpleTaskPricing && (
+            {!videoPricing && isDynamic && !simpleTaskPricing && (
               <DynamicPricingBreakdown
                 billingExpr={props.model.billing_expr}
                 usageSchema={props.model.billing_usage_schema}

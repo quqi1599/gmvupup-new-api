@@ -7710,7 +7710,12 @@
     "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.": "The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.",
     "Prices include the billing unit for each model": "Prices include the billing unit for each model",
     "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.": "Create videos from text and images, or edit a reference video. Pricing depends on resolution and reference video input.",
-    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input."
+    "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.": "Create videos from text, images and reference videos. Pricing depends on resolution and reference video input.",
+    "Estimated at 16:9, 24 fps. Reference video pricing applies to input plus output duration, with a possible minimum charge. Final cost depends on actual video specifications.": "Estimation en 16:9 à 24 i/s. Avec une vidéo de référence, la durée facturée comprend l’entrée et la sortie, avec un minimum possible. Le coût final dépend des caractéristiques réelles.",
+    "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "Estimation en 16:9 à 24 i/s, sans vidéo de référence. Voir les détails pour le tarif avec référence.",
+    "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "La vidéo d’entrée est facturée au même tarif par seconde. Les 5 premières images de référence sont gratuites ; chaque image supplémentaire coûte {{price}}.",
+    "No reference video": "Sans vidéo de référence",
+    "With reference video": "Avec vidéo de référence"
   },
   "ZPay / Epay Gateway": "Passerelle ZPay / Epay",
   "Use ZPay gateway": "Utiliser la passerelle ZPay",
