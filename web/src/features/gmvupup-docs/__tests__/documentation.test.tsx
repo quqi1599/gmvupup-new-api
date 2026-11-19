@@ -112,10 +112,12 @@ describe('GMVUPUP documentation', () => {
     )
     const copied = await navigator.clipboard.readText()
     expect(copied).toContain('https://gmvupup.top/v1/images/generations')
-    expect(copied).toContain('https://gmvupup.top/v1/videos')
+    expect(copied).toContain(
+      'https://gmvupup.top/doubao/api/v3/contents/generations/tasks'
+    )
     expect(copied).toContain('https://gmvupup.top/ali/api/v1/tasks/{task_id}')
-    expect(copied).toContain('refImageUrls')
-    expect(copied).toContain('refVideoUrls')
+    expect(copied).toContain('content.video_url')
+    expect(copied).toContain('x-oneapi-request-id')
     expect(copied).toContain('GET https://gmvupup.top/v1/models')
     expect(copied).toContain('Never ask me to paste a key into chat')
     expect(copied).toContain('Ask me what to create.')
@@ -144,7 +146,7 @@ describe('GMVUPUP documentation', () => {
     expect(copied).toContain('"model": "nanobanana-2.1"')
     expect(copied).toContain(brief)
     expect(copied).not.toContain('gpt-image-2.6')
-    expect(copied).not.toContain('/v1/videos')
+    expect(copied).not.toContain('/doubao/api/v3/contents/generations/tasks')
   })
   it('switches video models without mixing Seedance and Wan request formats', async () => {
     const user = userEvent.setup()
@@ -155,7 +157,8 @@ describe('GMVUPUP documentation', () => {
     await user.click(screen.getByRole('button', { name: 'Copy prompt' }))
     const seedance = await navigator.clipboard.readText()
     expect(seedance).toContain('"model": "doubao-seedance-2.0"')
-    expect(seedance).toContain('"userPrompt"')
+    expect(seedance).toContain('"content"')
+    expect(seedance).toContain('"resolution": "480p"')
     expect(seedance).not.toContain('/ali/api/v1')
     await user.selectOptions(model, 'wan3.0-video')
     await user.click(screen.getByRole('button', { name: 'Copy prompt' }))
@@ -164,7 +167,7 @@ describe('GMVUPUP documentation', () => {
     expect(wan).toContain('"resolution": "480P"')
     expect(wan).toContain('output.task_id')
     expect(wan).not.toContain('userPrompt')
-    expect(wan).not.toContain('/v1/videos')
+    expect(wan).not.toContain('/doubao/api/v3/contents/generations/tasks')
   })
   it('offers a selectable Chinese prompt when clipboard access fails', async () => {
     const user = userEvent.setup()
@@ -277,10 +280,11 @@ describe('GMVUPUP documentation', () => {
     )
     const copied = await navigator.clipboard.readText()
     expect(copied).toContain('"model": "doubao-seedance-2.0"')
-    expect(copied).toContain('"userPrompt":')
-    expect(copied).toContain('"duration": 5')
-    expect(copied).toContain('"quality": "720p"')
-    expect(copied).toContain('"aspectRatio": "16:9"')
+    expect(copied).toContain('/doubao/api/v3/contents/generations/tasks')
+    expect(copied).toContain('"content":')
+    expect(copied).toContain('"duration": 4')
+    expect(copied).toContain('"resolution": "720p"')
+    expect(copied).toContain('"ratio": "16:9"')
     expect(copied).not.toMatch(/"(prompt|seconds|size)":/)
   })
   it('uses live provider prices in the video guide and only documents its video endpoint', async () => {
@@ -301,25 +305,27 @@ describe('GMVUPUP documentation', () => {
       supported_endpoint_types: ['openai', 'anthropic', 'openai-video'],
       billing_plugin_variants: [
         {
-          plugin_key: 'ccg-seedance',
-          plugin_name: 'CCG Seedance',
+          plugin_key: 'doubao',
+          plugin_name: 'Doubao',
           billing_mode: 'tiered_expr',
           billing_expr:
-            'u("quality") == "480p" ? tier("480p", u("seconds") * 0.1) : u("quality") == "720p" ? tier("720p", u("seconds") * 0.2) : tier("1080p", u("seconds") * 0.4)',
+            'u("resolution") == "480p" ? (u("video_input") == "video" ? tier("480p-video", u("tokens") * 0.000004602739726027397) : tier("480p-none", u("tokens") * 0.000007671232876712329)) : (u("video_input") == "video" ? tier("720p-video", u("tokens") * 0.000004602739726027397) : tier("720p-none", u("tokens") * 0.000007671232876712329))',
           billing_usage_schema: {
-            seconds: { type: 'number', unit: 'second' },
-            quality: { enum: ['480p', '720p', '1080p'] },
+            tokens: { type: 'number', unit: 'token' },
+            resolution: { enum: ['480p', '720p'] },
+            video_input: { enum: ['none', 'video'] },
           },
         },
       ],
     }
     const router = await renderDocs('videos', true, [model])
     const table = screen.getAllByRole('table')[0]
-    for (const price of ['¥0.73', '¥1.46', '¥2.92']) {
-      expect(within(table).getByText(price)).toBeVisible()
-    }
+    expect(within(table).getByText('doubao-seedance-2.5')).toBeVisible()
+    expect(within(table).getByText(/¥0\.53802/)).toBeVisible()
+    expect(within(table).getByText(/¥1\.2096/)).toBeVisible()
     await router.navigate({ to: '/docs/$topic', params: { topic: 'models' } })
-    expect(await screen.findByText('openai-video')).toBeVisible()
+    expect(await screen.findByText('doubao', { exact: true })).toBeVisible()
+    expect(screen.queryByText('openai-video')).not.toBeInTheDocument()
     expect(screen.queryByText('anthropic')).not.toBeInTheDocument()
     expect(
       screen.queryByText('openai', { exact: true })
@@ -359,17 +365,28 @@ describe('GMVUPUP documentation', () => {
     const spec = JSON.parse(
       readFileSync('public/gmvupup/docs/openapi.json', 'utf8')
     )
-    expect(spec.servers).toEqual([{ url: API_BASE_URL }])
+    expect(spec.servers).toEqual([{ url: new URL(API_BASE_URL).origin }])
     expect(Object.keys(spec.paths).sort()).toEqual([
-      '/chat/completions',
-      '/images/edits',
-      '/images/generations',
-      '/models',
-      '/tasks/{task_id}/artifacts/last_frame/content',
-      '/videos',
-      '/videos/{task_id}',
-      '/videos/{task_id}/content',
+      '/doubao/api/v3/contents/generations/tasks',
+      '/doubao/api/v3/contents/generations/tasks/{task_id}',
+      '/v1/chat/completions',
+      '/v1/images/edits',
+      '/v1/images/generations',
+      '/v1/models',
     ])
+    const nativeExample =
+      spec.paths['/doubao/api/v3/contents/generations/tasks'].post.requestBody
+        .content['application/json'].example
+    expect(nativeExample).toMatchObject({
+      model: 'doubao-seedance-2.5',
+      content: [{ type: 'text', text: expect.any(String) }],
+      resolution: '480p',
+      ratio: '16:9',
+    })
+    const guide = readFileSync('public/gmvupup/docs/guide.md', 'utf8')
+    expect(guide).toContain('/doubao/api/v3/contents/generations/tasks')
+    expect(guide).toContain('x-oneapi-request-id')
+    expect(guide).not.toContain('固定秒价')
     for (const page of Object.values(DOC_PAGES)) {
       for (const source of Object.values(page.examples ?? {})) {
         expect(source).not.toMatch(/agtoken\.(vip|online)/)

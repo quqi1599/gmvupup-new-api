@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { API_EXAMPLES, SEEDANCE_MODELS } from '@/features/gmvupup/api-examples'
+import { SEEDANCE_MODELS } from '@/features/gmvupup/api-examples'
+import {
+  MODEL_API_ENDPOINTS,
+  SEEDANCE_API_EXAMPLES,
+} from '@/features/gmvupup/model-api'
 
 export type CodeExamples = Record<'curl' | 'python' | 'javascript', string>
 export type DocField = {
@@ -306,13 +310,12 @@ export const DOC_PAGES: Record<DocTopic, DocPage> = {
     group: 'reference',
     keywords: 'video seedance 2.5 2.0 视频 异步 任务 价格 轮询',
     method: 'POST',
-    endpoint: '/v1/videos',
+    endpoint: MODEL_API_ENDPOINTS.doubao.path,
     models: SEEDANCE_MODELS,
     body: [
-      'Use the JSON fields below for both Seedance models. Send requests with your GMVUPUP API key; the provider key is managed by the server.',
-      'Seedance uses userPrompt, duration, quality and aspectRatio. The prompt, seconds and size fields and multipart uploads are not accepted.',
+      'Use the GMVUPUP API key with the Doubao endpoint and send a JSON body.',
     ],
-    examples: API_EXAMPLES,
+    examples: SEEDANCE_API_EXAMPLES,
     fields: [
       {
         name: 'model',
@@ -322,87 +325,41 @@ export const DOC_PAGES: Record<DocTopic, DocPage> = {
           'Use doubao-seedance-2.5 or doubao-seedance-2.0 with your GMVUPUP API key.',
       },
       {
-        name: 'userPrompt',
-        type: 'string',
+        name: 'content',
+        type: 'object[]',
         required: true,
         description:
-          'Describe the scene, action and camera movement; 1–32000 characters, not blank.',
+          'For text-to-video, send a text item in content. For references, use the native media item types supported by the model.',
       },
       {
         name: 'duration',
         type: 'integer',
-        required: true,
-        description: 'Output duration: an integer from 4 to 15 seconds.',
+        required: false,
+        description:
+          'Output duration in whole seconds. The example uses 4 seconds.',
       },
       {
-        name: 'quality',
-        type: 'string',
-        required: true,
-        description: 'Output resolution: 480p, 720p or 1080p.',
-      },
-      {
-        name: 'aspectRatio',
-        type: 'string',
-        required: true,
-        description: 'Aspect ratio: 21:9, 16:9, 4:3, 1:1, 3:4 or 9:16.',
-      },
-      {
-        name: 'firstImageUrl / lastImageUrl',
+        name: 'resolution',
         type: 'string',
         required: false,
         description:
-          'First and last frame URLs. At most 9 images in total, including refImageUrls.',
+          'Choose a resolution supported by the selected model. Both models support 480p, 720p and 1080p on GMVUPUP.',
       },
       {
-        name: 'refImageUrls',
-        type: 'string[]',
-        required: false,
-        description:
-          'Reference image URLs; at most 9 images including first and last frames.',
-      },
-      {
-        name: 'refVideoUrls / refAudioUrls',
-        type: 'string[]',
-        required: false,
-        description: 'Reference video or audio URLs; at most 3 of each.',
-      },
-      {
-        name: 'generateAudio',
-        type: 'boolean',
-        required: false,
-        description:
-          'Whether to generate audio. Omit to use the upstream default.',
-      },
-      {
-        name: 'returnLastFrame',
-        type: 'boolean',
-        required: false,
-        description:
-          'Request a last-frame image. Download it only when lastFrameUrl is returned.',
-      },
-      {
-        name: 'seed',
-        type: 'integer',
-        required: false,
-        description: 'Random seed from -1 to 4294967295.',
-      },
-      {
-        name: 'bitrateMode',
+        name: 'ratio',
         type: 'string',
         required: false,
-        description: 'Video bitrate preset: standard or high.',
+        description:
+          'Output aspect ratio. The text-to-video example uses 16:9.',
       },
     ],
-    response:
-      '{\n  "id": "YOUR_TASK_ID",\n  "object": "video",\n  "status": "queued"\n}',
+    response: '{\n  "id": "task_YOUR_TASK_ID",\n  "status": "queued"\n}',
     followUp:
-      'curl "https://gmvupup.top/v1/videos/$TASK_ID" \\\n  -H "Authorization: Bearer $GMVUPUP_API_KEY"\n\n# After status is completed:\ncurl "https://gmvupup.top/v1/videos/$TASK_ID/content" \\\n  -H "Authorization: Bearer $GMVUPUP_API_KEY" \\\n  -o result.mp4',
+      'curl "https://gmvupup.top/doubao/api/v3/contents/generations/tasks/$TASK_ID" \\\n  -H "Authorization: Bearer $GMVUPUP_API_KEY"',
     notes: [
-      'Save the returned id. Poll about every 10 seconds; queued and in_progress are not completed results. Download after completed, and inspect the error for failed tasks.',
+      'Save the task ID from the JSON body. Poll about every 10 seconds while queued or running. When succeeded, read content.video_url. The x-oneapi-request-id header is for support.',
       'A timeout does not cancel an existing task. Check the saved task ID before considering another submission.',
-      'Use absolute HTTP(S) URLs for reference media. Authorized asset://asset_ID references are also supported; local file paths and Base64 are not accepted.',
-      'When returnLastFrame is enabled and the completed response contains lastFrameUrl, download that relative path from https://gmvupup.top using the same API key.',
-      'The rate is per output second at the selected resolution, including requests with reference media. A failed task returns its reserved GMVUPUP quota.',
+      'Download the signed result URL without your GMVUPUP API key.',
     ],
   },
   errors: {

@@ -25,6 +25,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
 import { selectCustomerModels } from '@/features/gmvupup/customer-models'
+import { getModelEndpointTypes } from '@/features/gmvupup/model-api'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
 export function ModelCatalog() {
@@ -62,7 +63,7 @@ export function ModelCatalog() {
           <div>
             <code>{model.model_name}</code>
             <div className='gmv-doc-endpoint-tags'>
-              {(model.supported_endpoint_types ?? []).map((endpoint) => (
+              {getModelEndpointTypes(model).map((endpoint) => (
                 <span key={endpoint}>{endpoint}</span>
               ))}
             </div>

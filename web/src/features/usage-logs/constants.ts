@@ -292,6 +292,8 @@ export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
   [TASK_ACTIONS.LYRICS]: { label: 'Generate Lyrics', variant: 'pink' },
   [TASK_ACTIONS.GENERATE]: { label: 'Image to Video', variant: 'blue' },
   [TASK_ACTIONS.TEXT_GENERATE]: { label: 'Text to Video', variant: 'blue' },
+  text_to_video: { label: 'Text to Video', variant: 'blue' },
+  image_to_video: { label: 'Image to Video', variant: 'blue' },
   [TASK_ACTIONS.FIRST_TAIL_GENERATE]: {
     label: 'First/Last Frame to Video',
     variant: 'blue',

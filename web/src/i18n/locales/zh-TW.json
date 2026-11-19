@@ -7715,7 +7715,17 @@
     "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "無參考影片，按16:9、24fps估算；參考影片價格見詳情。",
     "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "輸入影片按相同秒價計費。前5張參考圖片免費，超出部分每張{{price}}。",
     "No reference video": "無參考影片",
-    "With reference video": "有參考影片"
+    "With reference video": "有參考影片",
+    "Use the GMVUPUP API key with the Doubao endpoint and send a JSON body.": "使用 GMVUPUP API 金鑰，透過 Doubao 端點傳送 JSON 請求。",
+    "For text-to-video, send a text item in content. For references, use the native media item types supported by the model.": "文字生影片時，在 content 中傳入 text 項目。參考素材使用模型支援的原生媒體項目。",
+    "Output duration in whole seconds. The example uses 4 seconds.": "輸出長度以整數秒指定。範例使用 4 秒。",
+    "Choose a resolution supported by the selected model. Both models support 480p, 720p and 1080p on GMVUPUP.": "請選擇模型支援的解析度。本站兩款模型均支援 480p、720p 和 1080p。",
+    "Output aspect ratio. The text-to-video example uses 16:9.": "輸出長寬比。文字生影片範例使用 16:9。",
+    "Save the task ID from the JSON body. Poll about every 10 seconds while queued or running. When succeeded, read content.video_url. The x-oneapi-request-id header is for support.": "保存 JSON 正文中的任務 ID。queued 或 running 時約每 10 秒查詢一次。succeeded 後讀取 content.video_url。回應標頭 x-oneapi-request-id 用於排查請求。",
+    "Per-second prices are estimates. Final charges use the returned video token usage and the applicable pricing tier and group.": "每秒價格用於估算。實際費用依回傳的影片 Token 用量、計價級距與群組結算。",
+    "Download the signed result URL without your GMVUPUP API key.": "下載簽署的結果網址時，請省略 GMVUPUP API 金鑰。",
+    "POST JSON to the Doubao endpoint below. Put the text prompt in content and set resolution, ratio and duration to the approved values.": "向下方 Doubao 端點 POST JSON。將提示詞放進 content，並按已確認的值設定 resolution、ratio 和 duration。",
+    "If the task fails, report the error. If it is still running after 10 minutes, preserve the ID for resumption. Do not submit a duplicate paid task.": "若任務失敗，說明錯誤原因。10 分鐘後仍在處理時，保留 ID 供後續查詢，避免重複提交付費任務。"
   },
   "ZPay / Epay Gateway": "ZPay / 易支付閘道",
   "Use ZPay gateway": "使用 ZPay 閘道",

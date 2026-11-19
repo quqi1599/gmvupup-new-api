@@ -58,8 +58,7 @@ export function buildModelApiExample(options: {
   apiKeyEnv: string
 }): string | undefined {
   const { model, endpointType, language, apiKeyEnv } = options
-  const prompt =
-    'A blue ceramic cup on a pale yellow background, soft studio light.'
+  const prompt = VIDEO_EXAMPLE_PROMPT
   let body: Record<string, unknown>
   if (endpointType === 'gemini') {
     body = {
@@ -70,12 +69,14 @@ export function buildModelApiExample(options: {
         },
       ],
     }
-  } else if (endpointType === 'doubao' || endpointType === 'hailuo') {
+  } else if (endpointType === 'doubao') {
+    body = seedanceExampleBody(model.model_name)
+  } else if (endpointType === 'hailuo') {
     body = {
       model: model.model_name,
       content: [{ type: 'text', text: prompt }],
       duration: 4,
-      resolution: endpointType === 'hailuo' ? '768P' : '720p',
+      resolution: '768P',
       ratio: '16:9',
     }
   } else if (endpointType === 'alibaba') {
@@ -108,6 +109,52 @@ export function buildModelApiExample(options: {
   const url =
     options.baseUrl.replace(/\/$/, '') +
     options.path.replace('{model}', model.model_name)
+  return formatApiExample(url, language, apiKeyEnv, body)
+}
+
+const VIDEO_EXAMPLE_PROMPT =
+  'A blue ceramic cup on a pale yellow background, soft studio light.'
+
+function seedanceExampleBody(model: string) {
+  return {
+    model,
+    content: [{ type: 'text', text: VIDEO_EXAMPLE_PROMPT }],
+    duration: 4,
+    resolution: '720p',
+    ratio: '16:9',
+  }
+}
+
+const videoDocsUrl = `https://gmvupup.top${MODEL_API_ENDPOINTS.doubao.path}`
+const videoDocsBody = seedanceExampleBody('doubao-seedance-2.5')
+
+export const SEEDANCE_API_EXAMPLES = {
+  curl: formatApiExample(
+    videoDocsUrl,
+    'curl',
+    'GMVUPUP_API_KEY',
+    videoDocsBody
+  ),
+  python: formatApiExample(
+    videoDocsUrl,
+    'python',
+    'GMVUPUP_API_KEY',
+    videoDocsBody
+  ),
+  javascript: formatApiExample(
+    videoDocsUrl,
+    'javascript',
+    'GMVUPUP_API_KEY',
+    videoDocsBody
+  ),
+}
+
+function formatApiExample(
+  url: string,
+  language: 'curl' | 'python' | 'typescript' | 'javascript',
+  apiKeyEnv: string,
+  body: Record<string, unknown>
+) {
   const json = JSON.stringify(body, null, 2)
   if (language === 'curl') {
     return [

@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { TFunction } from 'i18next'
 
+import { MODEL_API_ENDPOINTS } from '@/features/gmvupup/model-api'
+
 export type SkillMode = 'all' | 'image' | 'video'
 export const IMAGE_MODELS = ['gpt-image-2.6', 'nanobanana-2.1']
 export const VIDEO_MODELS = [
@@ -90,21 +92,24 @@ export function buildAgentPrompt(
       `## ${t('Seedance video')}`,
       mode === 'all' ? VIDEO_MODELS.slice(0, 2).join(', ') : model,
       t(
-        'POST https://gmvupup.top/v1/videos with JSON. Use userPrompt, aspectRatio, duration and quality, not prompt/seconds/size or multipart. duration is an integer from 4 to 15; quality is 480p, 720p or 1080p; aspectRatio is 21:9, 16:9, 4:3, 1:1, 3:4 or 9:16. The body below is an example, not permission to use its cost settings.'
+        'POST JSON to the Doubao endpoint below. Put the text prompt in content and set resolution, ratio and duration to the approved values.'
+      ),
+      `POST https://gmvupup.top${MODEL_API_ENDPOINTS.doubao.path}`,
+      `GET https://gmvupup.top${MODEL_API_ENDPOINTS.doubao.path}/{task_id}`,
+      t(
+        'Save the task ID from the JSON body. Poll about every 10 seconds while queued or running. When succeeded, read content.video_url. The x-oneapi-request-id header is for support.'
       ),
       t(
-        'Optional reference fields: refImageUrls (array, at most 9 images including first/last frames), refVideoUrls (array, at most 3), refAudioUrls (array, at most 3), firstImageUrl and lastImageUrl (strings). Use reachable HTTP(S) URLs or existing asset://asset_ID references. A local path or chat attachment is not a public URL. Optional booleans: generateAudio, returnLastFrame. Reference fields must stay in this JSON body.'
+        'If the task fails, report the error. If it is still running after 10 minutes, preserve the ID for resumption. Do not submit a duplicate paid task.'
       ),
-      t(
-        'Save response.id. Poll GET https://gmvupup.top/v1/videos/{id} every 5 seconds for status queued/in_progress/completed/failed, for up to 10 minutes per session. On failed, stop and report error. If still running, return the ID and resume instructions; do not resubmit. On completed, GET https://gmvupup.top/v1/videos/{id}/content with the same Bearer key to save the video. Resolve relative artifact paths against https://gmvupup.top.'
-      ),
+      t('Download the signed result URL without your GMVUPUP API key.'),
       JSON.stringify(
         {
           model: mode === 'video' ? model : VIDEO_MODELS[0],
-          userPrompt: '<CREATIVE_BRIEF>',
-          aspectRatio: '16:9',
+          content: [{ type: 'text', text: '<CREATIVE_BRIEF>' }],
+          ratio: '16:9',
           duration: 4,
-          quality: '480p',
+          resolution: '480p',
         },
         null,
         2

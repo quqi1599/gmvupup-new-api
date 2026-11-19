@@ -7715,7 +7715,17 @@
     "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "参考動画なし、16:9・24fpsでの目安です。参考動画ありの料金は詳細をご確認ください。",
     "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "入力動画も同じ秒単価です。参考画像は最初の5枚まで無料、追加は1枚{{price}}です。",
     "No reference video": "参考動画なし",
-    "With reference video": "参考動画あり"
+    "With reference video": "参考動画あり",
+    "Use the GMVUPUP API key with the Doubao endpoint and send a JSON body.": "GMVUPUP API キーを使用し、Doubao エンドポイントに JSON を送信します。",
+    "For text-to-video, send a text item in content. For references, use the native media item types supported by the model.": "テキストから動画を生成するには、content に text 項目を入れます。参照素材はモデルが対応するメディア項目を使用します。",
+    "Output duration in whole seconds. The example uses 4 seconds.": "出力時間は整数秒で指定します。例では 4 秒です。",
+    "Choose a resolution supported by the selected model. Both models support 480p, 720p and 1080p on GMVUPUP.": "選択したモデルが対応する解像度を指定します。GMVUPUP では両方とも 480p、720p、1080p をサポートします。",
+    "Output aspect ratio. The text-to-video example uses 16:9.": "出力のアスペクト比です。テキスト動画の例は 16:9 です。",
+    "Save the task ID from the JSON body. Poll about every 10 seconds while queued or running. When succeeded, read content.video_url. The x-oneapi-request-id header is for support.": "JSON 本文のタスク ID を保存します。queued または running の間は約 10 秒ごとに照会し、succeeded 後に content.video_url を取得します。x-oneapi-request-id は調査用です。",
+    "Per-second prices are estimates. Final charges use the returned video token usage and the applicable pricing tier and group.": "秒単価は目安です。最終料金は動画の返却トークン数、適用料金区分、グループで精算されます。",
+    "Download the signed result URL without your GMVUPUP API key.": "署名付き結果 URL をダウンロードする際は GMVUPUP API キーを送信しません。",
+    "POST JSON to the Doubao endpoint below. Put the text prompt in content and set resolution, ratio and duration to the approved values.": "下記の Doubao エンドポイントに JSON を POST します。指示文は content に入れ、resolution、ratio、duration に承認済みの値を指定します。",
+    "If the task fails, report the error. If it is still running after 10 minutes, preserve the ID for resumption. Do not submit a duplicate paid task.": "失敗時はエラーを報告します。10 分を超えて実行中の場合は、再開用に ID を保存し、有料タスクを重複送信しません。"
   },
   "ZPay / Epay Gateway": "ZPay / Epay ゲートウェイ",
   "Use ZPay gateway": "ZPay ゲートウェイを使用",

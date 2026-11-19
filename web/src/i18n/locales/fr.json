@@ -7715,7 +7715,17 @@
     "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "Estimation en 16:9 à 24 i/s, sans vidéo de référence. Voir les détails pour le tarif avec référence.",
     "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "La vidéo d’entrée est facturée au même tarif par seconde. Les 5 premières images de référence sont gratuites ; chaque image supplémentaire coûte {{price}}.",
     "No reference video": "Sans vidéo de référence",
-    "With reference video": "Avec vidéo de référence"
+    "With reference video": "Avec vidéo de référence",
+    "Use the GMVUPUP API key with the Doubao endpoint and send a JSON body.": "Utilisez la clé API GMVUPUP avec le point de terminaison Doubao et envoyez un corps JSON.",
+    "For text-to-video, send a text item in content. For references, use the native media item types supported by the model.": "Pour générer une vidéo à partir de texte, ajoutez un élément text à content. Pour les références, utilisez les types de médias natifs pris en charge.",
+    "Output duration in whole seconds. The example uses 4 seconds.": "Durée de sortie en secondes entières. L’exemple utilise 4 secondes.",
+    "Choose a resolution supported by the selected model. Both models support 480p, 720p and 1080p on GMVUPUP.": "Choisissez une résolution compatible. Les deux modèles prennent en charge 480p, 720p et 1080p sur GMVUPUP.",
+    "Output aspect ratio. The text-to-video example uses 16:9.": "Proportions de sortie. L’exemple texte vers vidéo utilise 16:9.",
+    "Save the task ID from the JSON body. Poll about every 10 seconds while queued or running. When succeeded, read content.video_url. The x-oneapi-request-id header is for support.": "Conservez l’identifiant de tâche du JSON. Interrogez environ toutes les 10 secondes pendant queued ou running. Après succeeded, lisez content.video_url. L’en-tête x-oneapi-request-id sert au diagnostic.",
+    "Per-second prices are estimates. Final charges use the returned video token usage and the applicable pricing tier and group.": "Les prix à la seconde sont estimatifs. Le montant final dépend des tokens vidéo retournés, du tarif applicable et du groupe.",
+    "Download the signed result URL without your GMVUPUP API key.": "Téléchargez depuis l’URL signée sans envoyer votre clé API GMVUPUP.",
+    "POST JSON to the Doubao endpoint below. Put the text prompt in content and set resolution, ratio and duration to the approved values.": "Envoyez le JSON au point de terminaison Doubao ci-dessous. Placez le texte dans content et utilisez les valeurs approuvées pour resolution, ratio et duration.",
+    "If the task fails, report the error. If it is still running after 10 minutes, preserve the ID for resumption. Do not submit a duplicate paid task.": "Si la tâche échoue, indiquez l’erreur. Après 10 minutes, conservez son identifiant pour reprendre le suivi. Ne soumettez pas de tâche payante en double."
   },
   "ZPay / Epay Gateway": "Passerelle ZPay / Epay",
   "Use ZPay gateway": "Utiliser la passerelle ZPay",

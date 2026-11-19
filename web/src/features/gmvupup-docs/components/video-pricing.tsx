@@ -29,25 +29,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { isCcgSeedanceModel } from '@/features/gmvupup/api-examples'
+import { isNativeSeedanceModel } from '@/features/gmvupup/customer-models'
 import { ModelPriceCell } from '@/features/pricing/components/model-price-cell'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
 export function VideoPricing() {
   const { t } = useTranslation()
   const pricing = usePricingData()
-  const models = pricing.models.filter(isCcgSeedanceModel)
+  const models = pricing.models.filter(isNativeSeedanceModel)
   return (
     <section id='pricing' className='gmv-doc-section'>
       <h2>{t('Current video pricing')}</h2>
       <p className='gmv-doc-paragraph'>
         {t(
-          'Rates below come from the live catalog for the default group. Charge = output duration × resolution rate. Check your group in the console.'
-        )}
-      </p>
-      <p className='gmv-doc-paragraph'>
-        {t(
-          'The fixed per-second rates use 80% of the China-region official 16:9 examples without reference video, rather than billing by video tokens.'
+          'Per-second prices are estimates. Final charges use the returned video token usage and the applicable pricing tier and group.'
         )}
       </p>
       {pricing.isLoading && <LoadingState />}

@@ -7715,7 +7715,17 @@
     "Estimated at 16:9, 24 fps, without reference video. See details for reference video pricing.": "Ước tính ở 16:9, 24 fps, không có video tham chiếu. Xem chi tiết về giá có video tham chiếu.",
     "Input video is billed at the same rate. The first 5 reference images are free; each additional image costs {{price}}.": "Video đầu vào tính cùng đơn giá mỗi giây. 5 ảnh tham chiếu đầu tiên miễn phí; mỗi ảnh thêm có giá {{price}}.",
     "No reference video": "Không có video tham chiếu",
-    "With reference video": "Có video tham chiếu"
+    "With reference video": "Có video tham chiếu",
+    "Use the GMVUPUP API key with the Doubao endpoint and send a JSON body.": "Dùng khóa API GMVUPUP để gửi JSON đến điểm cuối Doubao.",
+    "For text-to-video, send a text item in content. For references, use the native media item types supported by the model.": "Để tạo video từ văn bản, thêm mục text vào content. Với nội dung tham chiếu, dùng loại phương tiện mà mô hình hỗ trợ.",
+    "Output duration in whole seconds. The example uses 4 seconds.": "Thời lượng đầu ra tính bằng giây nguyên. Ví dụ dùng 4 giây.",
+    "Choose a resolution supported by the selected model. Both models support 480p, 720p and 1080p on GMVUPUP.": "Chọn độ phân giải được hỗ trợ. Cả hai mô hình trên GMVUPUP hỗ trợ 480p, 720p và 1080p.",
+    "Output aspect ratio. The text-to-video example uses 16:9.": "Tỷ lệ khung hình đầu ra. Ví dụ tạo video từ văn bản dùng 16:9.",
+    "Save the task ID from the JSON body. Poll about every 10 seconds while queued or running. When succeeded, read content.video_url. The x-oneapi-request-id header is for support.": "Lưu ID tác vụ trong JSON. Truy vấn khoảng 10 giây một lần khi queued hoặc running. Khi succeeded, đọc content.video_url. Header x-oneapi-request-id dùng để chẩn đoán.",
+    "Per-second prices are estimates. Final charges use the returned video token usage and the applicable pricing tier and group.": "Giá theo giây là ước tính. Phí cuối cùng dựa trên số token video trả về, bậc giá và nhóm.",
+    "Download the signed result URL without your GMVUPUP API key.": "Tải kết quả qua URL ký sẵn mà không gửi khóa API GMVUPUP.",
+    "POST JSON to the Doubao endpoint below. Put the text prompt in content and set resolution, ratio and duration to the approved values.": "Gửi JSON bằng POST đến điểm cuối Doubao bên dưới. Đặt lời nhắc trong content và đặt resolution, ratio, duration theo giá trị đã duyệt.",
+    "If the task fails, report the error. If it is still running after 10 minutes, preserve the ID for resumption. Do not submit a duplicate paid task.": "Nếu tác vụ thất bại, báo lỗi. Nếu vẫn chạy sau 10 phút, lưu ID để tiếp tục. Không gửi lặp tác vụ tính phí."
   },
   "ZPay / Epay Gateway": "Cổng ZPay / Epay",
   "Use ZPay gateway": "Sử dụng cổng ZPay",

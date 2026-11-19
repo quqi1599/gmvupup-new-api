@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next'
 import { CopyButton } from '@/components/copy-button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-import { API_EXAMPLES } from '../api-examples'
+import { MODEL_API_ENDPOINTS, SEEDANCE_API_EXAMPLES } from '../model-api'
 
 export function IntegrationGuide() {
   const { t } = useTranslation()
@@ -95,11 +95,11 @@ export function IntegrationGuide() {
               <TabsTrigger value='python'>Python</TabsTrigger>
               <TabsTrigger value='javascript'>JavaScript</TabsTrigger>
             </TabsList>
-            {Object.entries(API_EXAMPLES).map(([language, code]) => (
+            {Object.entries(SEEDANCE_API_EXAMPLES).map(([language, code]) => (
               <TabsContent key={language} value={language}>
                 <div className='gmv-code-toolbar'>
                   <span>
-                    POST <b>/v1/videos</b>
+                    POST <b>{MODEL_API_ENDPOINTS.doubao.path}</b>
                   </span>
                   <CopyButton
                     value={code}

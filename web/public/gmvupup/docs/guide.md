@@ -92,75 +92,41 @@ curl "https://gmvupup.top/v1/chat/completions" \
 
 ## Seedance 视频任务
 
-模型：`doubao-seedance-2.5`、`doubao-seedance-2.0`。使用本站 Key，通过 `POST /v1/videos` 提交 JSON。
-
-### 人民币固定秒价
-
-2026-11-09 配置价格，default/vip/svip 当前分组倍率均为 1。实时价格以 https://gmvupup.top/pricing 为准。
-
-| 模型 | 480p 元/秒 | 720p 元/秒 | 1080p 元/秒 |
-| --- | ---: | ---: | ---: |
-| doubao-seedance-2.5 | 0.536 | 1.208 | 2.992 |
-| doubao-seedance-2.0 | 0.368 | 0.792 | 1.984 |
-
-费用 = 输出时长 × 对应分辨率秒价。比如 5 秒 720p，2.5 为 6.04 元，2.0 为 3.96 元。参考素材输入也使用对应分辨率的固定输出秒价。任务失败后退回本站预扣额度。
-
-定价参考[火山方舟中国区官方价格](https://ark.volcengine.com/region:cn-beijing/docs/model-pricing)中 16:9、无参考视频的每秒示例值 × 0.8；本站按固定秒价计费，不按实际视频 Token 重算。
+客户模型 ID 为 `doubao-seedance-2.5` 和 `doubao-seedance-2.0`。用本站 API Key 调用 Doubao 原生接口。
 
 ### 提交
 
 ```bash
-curl "https://gmvupup.top/v1/videos" \
+curl "https://gmvupup.top/doubao/api/v3/contents/generations/tasks" \
   -H "Authorization: Bearer $GMVUPUP_API_KEY" \
   -H "Content-Type: application/json" \
-  --max-time 240 \
+  --max-time 30 \
   -d '{
     "model": "doubao-seedance-2.5",
-    "userPrompt": "A sneaker floating above lilac dunes, slow camera movement.",
+    "content": [{"type": "text", "text": "A white cup on a table. The camera slowly pushes in."}],
     "duration": 5,
-    "quality": "720p",
-    "aspectRatio": "16:9"
+    "resolution": "480p",
+    "ratio": "16:9",
+    "generate_audio": false
   }'
 ```
 
-两模型请求格式一致。必填 `model`、`userPrompt`、`duration`、`quality`、`aspectRatio`：
+必填 `model` 和 `content`。上面的文生视频示例也明确指定时长、分辨率和宽高比。参考素材按模型支持的原生媒体类型加入 `content`。
 
-- `userPrompt`：1–32000 字符，不能全为空白。
-- `duration`：4–15 的整数秒。
-- `quality`：480p / 720p / 1080p。
-- `aspectRatio`：21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16。
-- `firstImageUrl`、`lastImageUrl`、`refImageUrls`：首尾帧与参考图片合计最多 9 张。
-- `refVideoUrls`、`refAudioUrls`：视频和音频参考各最多 3 个。
-- 参考素材使用可访问的绝对 HTTP(S) URL，或有权使用的 `asset://asset_ID`；不支持本地路径、Base64 和 multipart 上传。
-- 可选 `generateAudio`、`returnLastFrame` 为布尔值；`seed` 为 -1–4294967295 整数；`bitrateMode` 为 standard / high。
-- 不接受 `prompt`、`seconds`、`size` 等 OpenAI 视频字段。
+### 查询、下载和扣费
 
-响应示意（不是实际生成结果）：
-
-```json
-{"id":"YOUR_TASK_ID","object":"video","status":"queued"}
-```
-
-### 查询和下载
-
-保存返回的 `id` 为 `TASK_ID`，约每 10 秒查询一次。`queued`、`in_progress` 表示处理中，`completed` 后可下载，`failed` 时读取错误原因。
+从响应 JSON **正文**复制 `id`（以 `task_` 开头）。`x-oneapi-request-id` 响应头用于排查请求。
 
 ```bash
-curl "https://gmvupup.top/v1/videos/$TASK_ID" \
+curl "https://gmvupup.top/doubao/api/v3/contents/generations/tasks/$TASK_ID" \
   -H "Authorization: Bearer $GMVUPUP_API_KEY"
-
-# 仅在 completed 后下载
-curl "https://gmvupup.top/v1/videos/$TASK_ID/content" \
-  -H "Authorization: Bearer $GMVUPUP_API_KEY" \
-  -o result.mp4
-
-# 仅在请求 returnLastFrame 且返回 lastFrameUrl 后下载
-curl "https://gmvupup.top/v1/tasks/$TASK_ID/artifacts/last_frame/content" \
-  -H "Authorization: Bearer $GMVUPUP_API_KEY" \
-  -o last-frame.jpg
 ```
 
-查询、下载均使用本站 Key 和本站任务 ID。超时后先查询原任务，不自动重复提交。完整参数和三种语言示例见 https://gmvupup.top/docs/videos 。
+- `queued` 或 `running` 时，每约 10 秒重复查询。提交超时时先检查是否创建了任务，避免重复消费。
+- `succeeded` 后下载 `content.video_url` 对应的临时签名文件。访问该结果链接时省略本站 API Key。
+- `failed`、`cancelled` 或 `expired` 时检查错误与账单记录。
+
+[模型广场](https://gmvupup.top/pricing)显示的每秒价格用于估算。最终扣费按返回的计费 Token、分辨率、是否有参考视频及适用分组结算。任务完成后，在使用日志核对预扣、补扣或退款。
 
 ## 错误与重试
 
