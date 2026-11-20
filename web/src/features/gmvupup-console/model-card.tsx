@@ -22,11 +22,13 @@ import { useTranslation } from 'react-i18next'
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { CustomerModelCapabilities } from '@/features/gmvupup/components/model-capabilities'
 import { GmvupupModelLogo } from '@/features/gmvupup/components/model-logo'
 import {
   getCustomerModelName,
   getCustomerModelDescriptionKey,
 } from '@/features/gmvupup/customer-models'
+import { VideoResolutionPrices } from '@/features/pricing/components/video-resolution-prices'
 import { useBillingTime } from '@/features/pricing/hooks/use-billing-time'
 import type { ParsedTaskTier } from '@/features/pricing/lib/billing-expr'
 import { formatBillingCondition } from '@/features/pricing/lib/billing-expression/condition-display'
@@ -43,6 +45,7 @@ import {
 } from '@/features/pricing/lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '@/features/pricing/lib/price'
 import {
+  getVideoSecondPricing,
   taskPriceLabel,
   taskUsageUnitLabel,
   taskPricingConditions,
@@ -95,8 +98,26 @@ export function ConsoleModelCard(props: {
       typeof props.model.model_price !== 'number')
   const fixedUnit = getFixedPriceUnit(props.model)
   const unit = fixedUnit === 'image' ? t('image') : t('request')
+  const videoPricing =
+    available && category === 'video'
+      ? getVideoSecondPricing(props.model, options)
+      : null
+  let billingLabel = t('Metered billing')
+  if (category === 'image' && fixedUnit === 'image') {
+    billingLabel = t('Billed per image')
+  } else if (videoPricing) {
+    billingLabel = videoPricing.estimated
+      ? t('Estimated per-second price')
+      : t('Billed per second')
+  }
   let rows: { key: string; label: string; price: string; unit: string }[] = []
-  if (available && !unpriced && summary && !summary.isSpecialExpression) {
+  if (
+    !videoPricing &&
+    available &&
+    !unpriced &&
+    summary &&
+    !summary.isSpecialExpression
+  ) {
     if (
       summary.isTaskUsage &&
       !summary.providerCount &&
@@ -147,7 +168,7 @@ export function ConsoleModelCard(props: {
         ),
       }))
     }
-  } else if (available && !unpriced && !summary) {
+  } else if (!videoPricing && available && !unpriced && !summary) {
     if (isTokenBasedModel(props.model)) {
       const types = [
         'input',
@@ -216,11 +237,7 @@ export function ConsoleModelCard(props: {
           <h2>{getCustomerModelName(props.model)}</h2>
           <div className='gmvc-model-tags'>
             <span>{typeLabel}</span>
-            <span>
-              {category === 'image' && fixedUnit === 'image'
-                ? t('Billed per image')
-                : t('Metered billing')}
-            </span>
+            <span>{billingLabel}</span>
           </div>
         </div>
         <CopyButton
@@ -240,7 +257,8 @@ export function ConsoleModelCard(props: {
           )}
           <Icon size={15} aria-hidden='true' />
         </p>
-        {rows.length > 0 ? (
+        {videoPricing && <VideoResolutionPrices {...videoPricing} tiles />}
+        {!videoPricing && rows.length > 0 && (
           <dl
             className={
               rows.length === 1 ? 'gmvc-prices-single' : 'gmvc-prices-grid'
@@ -256,7 +274,8 @@ export function ConsoleModelCard(props: {
               </div>
             ))}
           </dl>
-        ) : (
+        )}
+        {!videoPricing && rows.length === 0 && (
           <p className='gmvc-price-unavailable'>{unavailableLabel}</p>
         )}
         {summary?.isTimePricing && <small>{t('Current period price')}</small>}
@@ -272,11 +291,16 @@ export function ConsoleModelCard(props: {
           </Button>
         )}
       </div>
-      <p className='gmvc-model-description'>
-        {descriptionKey
-          ? t(descriptionKey)
-          : description || t('No description available.')}
-      </p>
+      <CustomerModelCapabilities
+        model={props.model}
+        fallback={
+          <p className='gmvc-model-description'>
+            {descriptionKey
+              ? t(descriptionKey)
+              : description || t('No description available.')}
+          </p>
+        }
+      />
     </Card>
   )
 }

@@ -1039,7 +1039,7 @@ function GroupPricingSection(props: GroupPricingSectionProps) {
                   className='min-w-0 space-y-3 rounded-lg border p-3'
                 >
                   <h3 className='text-sm font-medium'>{group}</h3>
-                  <VideoResolutionPrices {...pricing} showReference />
+                  <VideoResolutionPrices {...pricing} />
                 </div>
               )
             )
@@ -1569,9 +1569,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
 
           <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-sm'>
             <SectionTitle>{t('Pricing')}</SectionTitle>
-            {videoPricing && (
-              <VideoResolutionPrices {...videoPricing} showReference />
-            )}
+            {videoPricing && <VideoResolutionPrices {...videoPricing} />}
             {!videoPricing && showBasePrices && (
               <PriceSection
                 model={props.model}

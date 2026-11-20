@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { CustomerModelCapabilities } from '@/features/gmvupup/components/model-capabilities'
 import { GmvupupModelLogo } from '@/features/gmvupup/components/model-logo'
 import {
   getCustomerModelName,
@@ -71,6 +72,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const usdExchangeRate = props.usdExchangeRate ?? 1
   const showRechargePrice = props.showRechargePrice ?? false
   const isTokenBased = isTokenBasedModel(props.model)
+  const fixedPriceUnit = getFixedPriceUnit(props.model)
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
   const descriptionKey = getCustomerModelDescriptionKey(props.model)
   const tags = parseTags(props.model.tags)
@@ -116,7 +118,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const videoPricing = getVideoSecondPricing(props.model, dynamicPriceOptions)
   let priceSummary: ReactNode
   if (videoPricing) {
-    priceSummary = <VideoResolutionPrices {...videoPricing} />
+    priceSummary = <VideoResolutionPrices {...videoPricing} tiles />
   } else if (dynamicSummary) {
     const cacheReadEntries = dynamicSummary.secondaryEntries.filter(
       (entry) => entry.field === 'cacheReadPrice' && entry.unit === 'token'
@@ -264,7 +266,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           )}
           <span className='text-muted-foreground text-xs font-normal'>
             {' '}
-            / {t(getFixedPriceUnit(props.model))}
+            / {t(fixedPriceUnit)}
           </span>
         </span>
       </div>
@@ -297,43 +299,51 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           )}
         </div>
         <CopyButton
-          value={getCustomerModelName(props.model)}
+          value={props.model.model_name}
           tooltip={t('Copy model name')}
           className='size-7'
           iconClassName='size-3.5'
         />
       </CardHeader>
       <CardContent className='flex flex-1 flex-col gap-3'>
-        <div className='flex min-w-0 flex-col gap-1.5'>
-          <p className='text-muted-foreground line-clamp-2 text-[13px] leading-5 break-words'>
-            {descriptionKey
-              ? t(descriptionKey)
-              : props.model.description || t('No description available.')}
-          </p>
-          {tags.length > 0 && (
-            <div
-              role='group'
-              aria-label={t('Tags')}
-              className='text-muted-foreground flex min-w-0 items-baseline gap-1.5 text-xs'
-            >
-              <span className='shrink-0'>{t('Tags')}</span>
-              <span className='truncate' title={tags.join(', ')}>
-                {tags.slice(0, 2).join(', ')}
+        {tags.length > 0 && (
+          <div
+            role='group'
+            aria-label={t('Tags')}
+            className='text-muted-foreground flex min-w-0 items-baseline gap-1.5 text-xs'
+          >
+            <span className='shrink-0'>{t('Tags')}</span>
+            <span className='truncate' title={tags.join(', ')}>
+              {tags.slice(0, 2).join(', ')}
+            </span>
+            {tags.length > 2 && (
+              <span className='shrink-0' title={tags.slice(2).join(', ')}>
+                +{tags.length - 2}
               </span>
-              {tags.length > 2 && (
-                <span className='shrink-0' title={tags.slice(2).join(', ')}>
-                  +{tags.length - 2}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
         <div
           role='group'
           aria-label={t('Pricing')}
-          className='mt-auto flex min-w-0 flex-col gap-1.5'
+          className={cn(
+            'flex min-w-0 flex-col gap-2',
+            videoPricing &&
+              'border-border rounded-lg border bg-amber-50/55 p-3 dark:bg-amber-950/15',
+            !isTokenBased &&
+              fixedPriceUnit === 'image' &&
+              'border-border rounded-lg border bg-blue-50/55 p-3 dark:bg-blue-950/15'
+          )}
         >
-          <ModelBillingModeBadge model={props.model} appearance='caption' />
+          {videoPricing ? (
+            <span className='text-muted-foreground text-xs'>
+              {videoPricing.estimated
+                ? t('Estimated per-second price')
+                : t('Billed per second')}
+            </span>
+          ) : (
+            <ModelBillingModeBadge model={props.model} appearance='caption' />
+          )}
           {dynamicSummary?.providerCount && (
             <span className='text-muted-foreground text-xs break-words'>
               {t('{{count}} providers', {
@@ -347,6 +357,16 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             {priceSummary}
           </div>
         </div>
+        <CustomerModelCapabilities
+          model={props.model}
+          fallback={
+            <p className='text-muted-foreground line-clamp-2 text-[13px] leading-5 break-words'>
+              {descriptionKey
+                ? t(descriptionKey)
+                : props.model.description || t('No description available.')}
+            </p>
+          }
+        />
         {(groups.length > 0 || endpoints.length > 0) && (
           <dl
             className={cn(

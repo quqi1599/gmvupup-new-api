@@ -38,6 +38,7 @@ import {
   getQuotaTypeLabels,
 } from '../constants'
 import { getModelQuotaType, parseTags } from '../lib/filters'
+import { getFixedPriceUnit } from '../lib/model-helpers'
 import type { PricingModel, PricingVendor } from '../types'
 
 type FilterOption = {
@@ -156,6 +157,7 @@ export const PricingSidebar = memo(function PricingSidebar(
     const tags = new Map<string, number>()
     const endpoints = new Map<string, number>()
     const quotas = { token: 0, request: 0, task: 0 }
+    let imageRequests = 0
     for (const model of props.models) {
       if (model.vendor_name) {
         vendors.set(
@@ -173,8 +175,14 @@ export const PricingSidebar = memo(function PricingSidebar(
       }
       const quotaType = getModelQuotaType(model)
       if (quotaType) quotas[quotaType]++
+      if (
+        quotaType === QUOTA_TYPES.REQUEST &&
+        getFixedPriceUnit(model) === 'image'
+      ) {
+        imageRequests++
+      }
     }
-    return { vendors, tags, endpoints, quotas }
+    return { vendors, tags, endpoints, quotas, imageRequests }
   }, [props.models])
   const quotaTypeLabels = getQuotaTypeLabels(t)
   const endpointTypeLabels = getEndpointTypeLabels(t)
@@ -220,7 +228,11 @@ export const PricingSidebar = memo(function PricingSidebar(
     },
     {
       value: QUOTA_TYPES.REQUEST,
-      label: quotaTypeLabels[QUOTA_TYPES.REQUEST],
+      label:
+        counts.imageRequests > 0 &&
+        counts.imageRequests === counts.quotas.request
+          ? t('Billed per image')
+          : quotaTypeLabels[QUOTA_TYPES.REQUEST],
       count: counts.quotas.request,
     },
     {

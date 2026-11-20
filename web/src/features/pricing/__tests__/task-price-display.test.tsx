@@ -22,6 +22,7 @@ import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 
+import { ConsoleModelCard } from '@/features/gmvupup-console/model-card'
 import zhLocale from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import {
@@ -99,6 +100,15 @@ it('shows Seedance second estimates across cards, cells and details while retain
           onClick={vi.fn()}
         />
       </div>
+      <div data-testid='second-console-card'>
+        <ConsoleModelCard
+          model={seedanceSecondPriceModel}
+          selectedGroup='default'
+          priceRate={7.3}
+          usdExchangeRate={7.3}
+          onDetails={vi.fn()}
+        />
+      </div>
       <div data-testid='second-cell'>
         <ModelPriceCell
           model={seedanceSecondPriceModel}
@@ -122,10 +132,17 @@ it('shows Seedance second estimates across cards, cells and details while retain
       </div>
     </QueryClientProvider>
   )
-  for (const section of ['second-card', 'second-cell', 'second-details']) {
+  for (const section of [
+    'second-card',
+    'second-console-card',
+    'second-cell',
+    'second-details',
+  ]) {
     const scope = within(screen.getByTestId(section))
     expect(scope.getAllByText('¥0.53802').length).toBeGreaterThan(0)
     expect(scope.getAllByText('¥1.2096').length).toBeGreaterThan(0)
+    expect(scope.getAllByText('¥0.72576').length).toBeGreaterThan(0)
+    expect(scope.getAllByText('With reference video').length).toBeGreaterThan(0)
     expect(
       scope.queryByText(/1M token|Billing token unit price/i)
     ).not.toBeInTheDocument()
@@ -137,7 +154,7 @@ it('shows Seedance second estimates across cards, cells and details while retain
   await act(() => i18next.changeLanguage('zhCN'))
   expect(details.getAllByText('有参考视频').length).toBeGreaterThan(0)
   expect(details.getAllByText(/按16:9、24fps估算/).length).toBeGreaterThan(0)
-  expect(screen.getByTestId('second-details')).not.toHaveTextContent(/Token/i)
+  expect(details.getAllByText(/最终按实际视频 Token/).length).toBeGreaterThan(0)
   expect(JSON.stringify(seedanceSecondPriceModel)).toBe(before)
 })
 
@@ -227,7 +244,8 @@ it('shows MiniMax H3 second prices with the input-video and extra-image charges'
   render(<ModelCard model={h3} onClick={vi.fn()} />)
   expect(screen.getByText('¥0.5')).toBeVisible()
   expect(screen.getByText('¥0.8')).toBeVisible()
-  expect(screen.getByText(/first 5 reference images.*¥0.2/)).toBeVisible()
+  expect(screen.getByText(/first 5 input images.*¥0.2/)).toBeVisible()
+  expect(screen.getByText('Billed per second')).toBeVisible()
   expect(screen.queryByText('View details')).not.toBeInTheDocument()
 })
 

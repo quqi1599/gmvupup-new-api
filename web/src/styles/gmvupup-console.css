@@ -445,6 +445,9 @@
   gap: 3px;
   flex-wrap: wrap;
 }
+.gmvc-model-video .gmvc-model-prices dd {
+  display: block;
+}
 .gmvc-model-prices dd strong {
   font-size: 22px;
   font-weight: 700;

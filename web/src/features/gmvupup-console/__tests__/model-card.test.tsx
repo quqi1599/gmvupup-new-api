@@ -73,7 +73,11 @@ describe('simple model cards', () => {
     const pricing = screen.getByRole('group', { name: 'Pricing' })
     expect(within(pricing).getByText(price)).toBeVisible()
     expect(pricing).toHaveTextContent('/ image')
-    expect(screen.getByText('Create product photos.')).toBeVisible()
+    expect(
+      screen.getByText(
+        'Generate images from text or edit an uploaded reference image.'
+      )
+    ).toBeVisible()
     expect(screen.queryByText(/POST \/v1/)).not.toBeInTheDocument()
   })
   it('does not present the cheapest other group when the selected group is unavailable', () => {
@@ -116,7 +120,7 @@ describe('simple model cards', () => {
       ['720p', '¥1.46'],
       ['1080p', '¥2.92'],
     ]) {
-      const label = screen.getByText(`Resolution: ${resolution}`)
+      const label = screen.getByText(resolution)
       expect(label.parentElement).toHaveTextContent(price)
       expect(label.parentElement).toHaveTextContent('/ s')
     }

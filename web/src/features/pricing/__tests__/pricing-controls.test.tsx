@@ -245,7 +245,7 @@ describe('pricing controls', () => {
       screen.getByRole('button', { name: /^Token-based\s*1$/ })
     ).toBeVisible()
     expect(
-      screen.getByRole('button', { name: /^Per Request\s*1$/ })
+      screen.getByRole('button', { name: /^Billed per image\s*1$/ })
     ).toBeVisible()
     expect(
       screen.getByRole('button', { name: /^Task billing\s*1$/ })
