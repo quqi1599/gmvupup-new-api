@@ -149,3 +149,27 @@ func TestCPAMessagesBridgeIncompletePreservesUnknownUsage(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudeNativePartialToolWithLengthTerminal(t *testing.T) {
+	frames := []string{
+		`{"type":"message_start","message":{"id":"fixture","model":"wire","usage":{"input_tokens":12,"output_tokens":0}}}`,
+		`{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call","name":"lookup","input":{}}}`,
+		`{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"n\":"}}`,
+		`{"type":"content_block_stop","index":0}`,
+		`{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":7}}`,
+		`{"type":"message_stop"}`,
+	}
+	wire := "data: " + strings.Join(frames, "\n\ndata: ") + "\n\n"
+	recorder, c, info, resp := newClaudeStreamErrorTestContext(types.RelayFormatClaude, wire)
+	usage, err := ClaudeStreamHandler(c, resp, info)
+	require.Nil(t, err)
+	require.NotNil(t, usage)
+	require.Equal(t, 7, usage.CompletionTokens)
+	require.Equal(t, "incomplete", info.ResponsesOutcome.State)
+	require.Equal(t, "max_output_tokens", info.ResponsesOutcome.Reason)
+	require.False(t, info.ShouldRecordChannelSuccess())
+	require.Contains(t, recorder.Body.String(), frames[2])
+	require.Contains(t, recorder.Body.String(), `"stop_reason":"max_tokens"`)
+	require.Contains(t, recorder.Body.String(), frames[5])
+	require.NotContains(t, recorder.Body.String(), `"stop_reason":"tool_use"`)
+}

@@ -137,6 +137,16 @@ func AppendRelayObservabilityAdminInfo(ctx *gin.Context, relayInfo *relaycommon.
 	if ctx == nil || adminInfo == nil {
 		return
 	}
+	// StartTime and frt exclude request intake and initial routing. Record
+	// both sides of that boundary without changing the retry or billing clock.
+	ingress := common.GetContextKeyTime(ctx, constant.ContextKeyRelayIngressTime)
+	start := common.GetContextKeyTime(ctx, constant.ContextKeyRequestStartTime)
+	if !ingress.IsZero() && !start.Before(ingress) {
+		adminInfo["pre_relay_ms"] = start.Sub(ingress).Milliseconds()
+	}
+	if intake, ok := common.GetContextKeyType[int64](ctx, constant.ContextKeyRelayRequestIntakeMS); ok {
+		adminInfo["request_intake_ms"] = intake
+	}
 	if controls, ok := common.GetContextKeyType[*types.RequestControls](ctx, constant.ContextKeyRequestControlsDiagnostic); ok && controls != nil && controls.Valid() {
 		adminInfo["request_controls"] = *controls
 	}

@@ -41,7 +41,7 @@ func Distribute() func(c *gin.Context) {
 		channelId, ok := common.GetContextKey(c, constant.ContextKeyTokenSpecificChannelId)
 		intakeStarted := time.Now()
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
-		c.Set("relay_request_intake_ms", time.Since(intakeStarted).Milliseconds())
+		common.SetContextKey(c, constant.ContextKeyRelayRequestIntakeMS, time.Since(intakeStarted).Milliseconds())
 		if err != nil {
 			if statusCode, errorCode, publicMessage, classified := service.ClassifyRequestBodyFailure(err); classified {
 				abortWithOpenAiMessage(c, statusCode, publicMessage, errorCode)

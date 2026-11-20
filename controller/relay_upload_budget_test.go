@@ -41,7 +41,10 @@ func TestDistributorUploadDoesNotSpendSelectionBudget(t *testing.T) {
 	require.Equal(t, 1, got.context.GetInt("retry_candidate_skip_count"))
 	require.Equal(t, 1, got.context.GetInt("retry_attempt_no"))
 	require.False(t, got.context.GetTime("relay_retry_started_at").Before(uploadFinished))
-	require.GreaterOrEqual(t, got.context.GetInt64("relay_request_intake_ms"), int64(1100))
+	admin := make(map[string]interface{})
+	service.AppendRelayObservabilityAdminInfo(got.context, nil, admin)
+	require.GreaterOrEqual(t, admin["request_intake_ms"], int64(1100))
+	require.GreaterOrEqual(t, admin["pre_relay_ms"], admin["request_intake_ms"])
 	require.Contains(t, got.response.Body.String(), `"type":"response.completed"`)
 }
 

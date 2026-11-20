@@ -932,6 +932,14 @@ func FormatClaudeResponseInfo(claudeResponse *dto.ClaudeResponse, oaiResponse *d
 	return true
 }
 
+func claudeStreamError(upstream types.ClaudeError) *types.NewAPIError {
+	status := http.StatusInternalServerError
+	if code, ok := upstream.Code.(string); ok && code == "invalid_claude_sse_event" {
+		status = http.StatusBadGateway
+	}
+	return types.WithClaudeError(upstream, status, types.ErrOptionWithSkipRetry(), types.ErrOptionWithChannelPenalty())
+}
+
 func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claudeInfo *ClaudeResponseInfo, data string, streamResult *helper.StreamResult) (string, *types.NewAPIError) {
 	var claudeResponse dto.ClaudeResponse
 	err := common.UnmarshalJsonStr(data, &claudeResponse)
@@ -943,7 +951,7 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		return "", types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 	if claudeError := claudeResponse.GetClaudeError(); claudeError != nil && (claudeError.Type != "" || claudeError.Code != nil) {
-		apiErr := types.WithClaudeError(*claudeError, http.StatusInternalServerError, types.ErrOptionWithSkipRetry(), types.ErrOptionWithChannelPenalty())
+		apiErr := claudeStreamError(*claudeError)
 		if helper.StreamStarted(c) {
 			if writeErr := helper.SendInBandStreamError(c, info.RelayFormat, apiErr); writeErr != nil {
 				logger.LogError(c, "send in-band stream error failed: "+writeErr.Error())
@@ -1177,7 +1185,7 @@ func ClaudeResponsesStreamHandler(c *gin.Context, resp *http.Response, info *rel
 			return
 		}
 		if claudeError := claudeResponse.GetClaudeError(); claudeError != nil && (claudeError.Type != "" || claudeError.Code != nil) {
-			streamErr = types.WithClaudeError(*claudeError, http.StatusInternalServerError, types.ErrOptionWithSkipRetry(), types.ErrOptionWithChannelPenalty())
+			streamErr = claudeStreamError(*claudeError)
 			if helper.StreamStarted(c) {
 				_ = helper.SendInBandStreamError(c, info.RelayFormat, streamErr)
 			}

@@ -120,3 +120,24 @@ func TestClaudeSafetyStreamErrorPreservesCodeBeforeAndAfterOutput(t *testing.T) 
 		}
 	}
 }
+
+func TestClaudeInvalidUpstreamToolStreamStatus(t *testing.T) {
+	for _, format := range []types.RelayFormat{types.RelayFormatClaude, types.RelayFormatOpenAI, types.RelayFormatOpenAIResponses} {
+		sse := "data: {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"code\":\"invalid_claude_sse_event\",\"message\":\"fixture\"}}\n\n"
+		w, c, info, resp := newClaudeStreamErrorTestContext(format, sse)
+		_, _ = c.Writer.Write([]byte(": ping\n\n"))
+		var err *types.NewAPIError
+		if format == types.RelayFormatOpenAIResponses {
+			_, err = ClaudeResponsesStreamHandler(c, resp, info)
+		} else {
+			_, err = ClaudeStreamHandler(c, resp, info)
+		}
+		require.NotNil(t, err)
+		require.Equal(t, http.StatusBadGateway, err.StatusCode)
+		require.Equal(t, types.ErrorCode("invalid_claude_sse_event"), err.GetErrorCode())
+		require.True(t, types.IsSkipRetryError(err))
+		require.True(t, types.IsChannelPenaltyAllowed(err))
+		require.Contains(t, w.Body.String(), "invalid_claude_sse_event")
+		require.NotContains(t, w.Body.String(), "[DONE]")
+	}
+}

@@ -93,3 +93,28 @@ func TestWriteRelayErrorPreservesRetryAfterForCompactionRouteUnavailable(t *test
 	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
 	require.Contains(t, recorder.Body.String(), string(types.ErrorCodeCompactionRouteUnavailable))
 }
+
+func TestWriteChatCooldownWithUpstreamWait(t *testing.T) {
+	const date = "Sun, 06 Nov 1994 08:49:37 GMT"
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusServiceUnavailable} {
+		for _, tc := range []struct{ value, expected, hint string }{
+			{"17", "17", "retry after 17 seconds"}, {date, date, "retry after " + date},
+			{"", "", ""}, {"-1", "", ""}, {"30s", "", ""}, {"1.5", "", ""}, {"3\r\nX:4", "", ""},
+		} {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			err := parseCPAContractError(t, status, `{"error":{"message":"eligible keys are waiting for recovery","type":"server_error","code":"model_cooldown"}}`)
+			err.SetRetryAfter(tc.value)
+			writeRelayError(c, nil, types.RelayFormatOpenAI, err)
+			require.Equal(t, status, recorder.Code)
+			require.Equal(t, tc.expected, recorder.Header().Get("Retry-After"))
+			require.Contains(t, recorder.Body.String(), "model_cooldown")
+			if tc.hint != "" {
+				require.Contains(t, recorder.Body.String(), tc.hint)
+			} else {
+				require.NotContains(t, recorder.Body.String(), "retry after")
+			}
+		}
+	}
+}

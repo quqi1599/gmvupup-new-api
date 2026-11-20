@@ -3,8 +3,10 @@ package middleware
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -52,6 +54,7 @@ func inboundRequestID(c *gin.Context) string {
 
 func RequestId() func(c *gin.Context) {
 	return func(c *gin.Context) {
+		common.SetContextKey(c, constant.ContextKeyRelayIngressTime, time.Now())
 		attemptID := common.NewRequestId()
 		id := inboundRequestID(c)
 		if id == "" {

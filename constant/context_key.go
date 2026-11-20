@@ -11,6 +11,8 @@ const (
 	ContextKeyRequestStartTime ContextKey = "request_start_time"
 
 	/* relay observability keys */
+	ContextKeyRelayIngressTime           ContextKey = "relay_ingress_time"
+	ContextKeyRelayRequestIntakeMS       ContextKey = "relay_request_intake_ms"
 	ContextKeyRelayCancelOrigin          ContextKey = "relay_cancel_origin"
 	ContextKeyRelayBodyComplete          ContextKey = "relay_body_complete"
 	ContextKeyRelayConnectedUpstream     ContextKey = "relay_connected_upstream"

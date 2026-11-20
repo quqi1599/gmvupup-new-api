@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -546,7 +547,22 @@ func writeRelayError(c *gin.Context, ws *websocket.Conn, relayFormat types.Relay
 	for _, header := range []string{"Content-Type", "Cache-Control", "Connection", "Transfer-Encoding", "X-Accel-Buffering"} {
 		c.Writer.Header().Del(header)
 	}
-	if relayErr.HasGatewayRetryScope() && relayErr.GetRetryAfter() != "" {
+	var cooldownHint string
+	if relayErr.GetErrorCode() == "model_cooldown" && relayErr.HasUpstreamResponse() &&
+		(relayErr.StatusCode == http.StatusTooManyRequests || relayErr.StatusCode == http.StatusServiceUnavailable) {
+		// Clients such as TRAE surface error.message but may hide HTTP headers.
+		// Only expose the typed upstream wait; a cooldown is not a guaranteed reset.
+		raw := relayErr.GetRetryAfter()
+		if seconds, err := strconv.ParseUint(raw, 10, 63); err == nil {
+			value := strconv.FormatUint(seconds, 10)
+			c.Header("Retry-After", value)
+			cooldownHint = "retry after " + value + " seconds"
+		} else if at, err := http.ParseTime(raw); err == nil {
+			value := at.UTC().Format(http.TimeFormat)
+			c.Header("Retry-After", value)
+			cooldownHint = "retry after " + value
+		}
+	} else if relayErr.HasGatewayRetryScope() && relayErr.GetRetryAfter() != "" {
 		c.Header("Retry-After", relayErr.GetRetryAfter())
 	} else if isCompactionRouteUnavailableError(relayErr) {
 		retryAfter := relayErr.GetRetryAfter()
@@ -571,9 +587,11 @@ func writeRelayError(c *gin.Context, ws *websocket.Conn, relayFormat types.Relay
 			"error": relayErr.ToClaudeError(),
 		})
 	default:
-		c.JSON(relayErr.StatusCode, gin.H{
-			"error": relayErr.ToOpenAIError(),
-		})
+		public := relayErr.ToOpenAIError()
+		if cooldownHint != "" {
+			public.Message += " (" + cooldownHint + ")"
+		}
+		c.JSON(relayErr.StatusCode, gin.H{"error": public})
 	}
 }
 

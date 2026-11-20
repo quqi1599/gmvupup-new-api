@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel/openrouter"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 
@@ -128,6 +129,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	metadataOnlyStream := true
 	var streamItems []string // store stream items
 	var lastStreamData string
+	var pendingStreamData string
 	var secondLastStreamData string // 存储倒数第二个stream data，用于音频模型
 
 	// 检查是否为音频模型
@@ -189,23 +191,33 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		terminalObserver.observeChatTerminal(info, data, &terminalUsage)
 		// Retain the current accepted frame before flushing the prior buffered
 		// one. A downstream failure must not discard usage that already arrived.
-		previousStreamData := lastStreamData
-		if len(data) > 0 {
-			// 对音频模型，保存倒数第二个stream data
-			if isAudioModel && previousStreamData != "" {
-				secondLastStreamData = previousStreamData
-			}
-
-			lastStreamData = data
-			streamItems = append(streamItems, data)
+		if isAudioModel {
+			secondLastStreamData = lastStreamData
 		}
-		if previousStreamData != "" {
-			if err := HandleStreamFormat(c, info, previousStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
+		lastStreamData = data
+		streamItems = append(streamItems, data)
+
+		forward := func(chunk string) bool {
+			if err := HandleStreamFormat(c, info, chunk, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
 				deliveryFailure = helper.DownstreamStreamError(c, info, err)
 				sr.Stop(err)
-				return
+				return false
 			}
+			return true
+		}
+		prior := pendingStreamData
+		pendingStreamData = data
+		if prior != "" && !forward(prior) {
+			return
+		}
+
+		// Native Chat deltas without usage do not need final-frame filtering.
+		// Keep metadata and usage frames pending for the existing finalizer.
+		if info.RelayFormat == types.RelayFormatOpenAI && info.RelayMode == relayconstant.RelayModeChatCompletions &&
+			!isAudioModel && parsedEvent["usage"] == nil && hasGeneratedChatDelta(parsedEvent) {
+			pendingStreamData = ""
+			forward(data)
 		}
 	})
 	if streamErr := helper.PreOutputStreamError(c, info); streamErr != nil {
@@ -247,7 +259,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	if info.RelayFormat == types.RelayFormatOpenAI && deliveryFailure == nil {
-		if shouldSendLastResp {
+		if shouldSendLastResp && pendingStreamData != "" {
 			lastStreamPayload, done := helper.NormalizeSSEPayload(lastStreamData)
 			if !done && lastStreamPayload != "" {
 				if err := sendStreamData(c, info, lastStreamPayload, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
