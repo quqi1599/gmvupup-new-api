@@ -70,9 +70,16 @@ type Session struct {
 	BeforeCall func() error
 }
 
-func (s *Session) before() error {
+func (s *Session) acquireCall(ctx context.Context) error {
 	if s.Meter.Attempts >= MaxCalls {
 		return errors.New("web tool call limit exceeded")
+	}
+	return acquireToolSlot(ctx)
+}
+
+func (s *Session) startAttempt(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if s.BeforeCall != nil {
 		if err := s.BeforeCall(); err != nil {
@@ -83,7 +90,11 @@ func (s *Session) before() error {
 	return nil
 }
 func (s *Session) Search(ctx context.Context, r SearchRequest) ([]Hit, error) {
-	if err := s.before(); err != nil {
+	if err := s.acquireCall(ctx); err != nil {
+		return nil, err
+	}
+	defer activeToolCalls.Release(1)
+	if err := s.startAttempt(ctx); err != nil {
 		return nil, err
 	}
 	hits, err := s.Backend.Search(ctx, r)
@@ -93,7 +104,11 @@ func (s *Session) Search(ctx context.Context, r SearchRequest) ([]Hit, error) {
 	return hits, err
 }
 func (s *Session) Fetch(ctx context.Context, target string) (Page, error) {
-	if err := s.before(); err != nil {
+	if err := s.acquireCall(ctx); err != nil {
+		return Page{}, err
+	}
+	defer activeToolCalls.Release(1)
+	if err := s.startAttempt(ctx); err != nil {
 		return Page{}, err
 	}
 	page, err := s.Backend.Fetch(ctx, target)

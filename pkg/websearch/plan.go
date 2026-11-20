@@ -411,8 +411,11 @@ func (p *Plan) Execute(ctx context.Context, s *Session, c Call) (Executed, error
 	}
 	if err != nil {
 		var guard *GuardError
-		if errors.As(err, &guard) {
+		if errors.As(err, &guard) || errors.Is(err, ErrToolCapacity) {
 			return e, err
+		}
+		if ctx.Err() != nil {
+			return e, ctx.Err()
 		}
 		e.Failed = true
 		data = map[string]any{"error": err.Error(), "provider": "deepseek"}

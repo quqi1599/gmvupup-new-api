@@ -29,9 +29,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"github.com/tidwall/gjson"
+	"golang.org/x/sync/semaphore"
 )
 
-var managedWebSlots = make(chan struct{}, 8)
+const managedWebBufferLimit = 32 << 20
+
+// Keep the previous aggregate input limit (8 x 32 MiB). Small model loops
+// reserve at least half a full input to bound the number of live capture and
+// history buffers to 16. Standalone batches can retain many tool results.
+var managedWebRequestBudget = semaphore.NewWeighted(8 * managedWebBufferLimit)
 
 func managedProtocol(info *relaycommon.RelayInfo) string {
 	switch info.RelayFormat {
@@ -54,10 +60,26 @@ func webError(err error, status int) *types.NewAPIError {
 	return types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, status, types.ErrOptionWithSkipRetry())
 }
 
+// Both standalone commands and model-issued calls use this boundary. Queue
+// rejection is local; it must not penalize a model channel or replay a round.
+func managedToolError(c *gin.Context, err error) *types.NewAPIError {
+	if errors.Is(err, websearch.ErrToolCapacity) {
+		return webError(err, http.StatusServiceUnavailable)
+	}
+	if ctxErr := c.Request.Context().Err(); ctxErr != nil && errors.Is(err, ctxErr) {
+		return channel.ClassifyDoRequestError(c, err)
+	}
+	return webError(err, http.StatusBadGateway)
+}
+
 // ManagedWebHelper surrounds the existing per-channel relay. Every model round
 // retains its normal provider, request conversions, audit and pricing. Only web
 // tools are executed locally; they never reach the model provider as hosted tools.
 func ManagedWebHelper(c *gin.Context, info *relaycommon.RelayInfo, run func() *types.NewAPIError) *types.NewAPIError {
+	return managedWebHelper(c, info, run, websearch.ProductionClient)
+}
+
+func managedWebHelper(c *gin.Context, info *relaycommon.RelayInfo, run func() *types.NewAPIError, getClient func() (*websearch.Client, error)) *types.NewAPIError {
 	if !websearch.Enabled() {
 		return run()
 	}
@@ -102,16 +124,18 @@ func ManagedWebHelper(c *gin.Context, info *relaycommon.RelayInfo, run func() *t
 		}
 	}
 	common.SetContextKey(c, constant.ContextKeyWebSearchMode, "managed_live")
-	if len(body) > 32<<20 {
+	if len(body) > managedWebBufferLimit {
 		return webError(errors.New("managed web request exceeds 32 MiB"), 413)
 	}
-	select {
-	case managedWebSlots <- struct{}{}:
-		defer func() { <-managedWebSlots }()
-	default:
-		return webError(errors.New("managed web search capacity is temporarily exhausted"), 503)
+	weight := max(int64(len(body)), int64(managedWebBufferLimit/2))
+	if alpha {
+		weight = managedWebBufferLimit
 	}
-	client, err := websearch.ProductionClient()
+	if !managedWebRequestBudget.TryAcquire(weight) {
+		return webError(errors.New("managed web request buffer capacity is temporarily exhausted"), http.StatusServiceUnavailable)
+	}
+	defer managedWebRequestBudget.Release(weight)
+	client, err := getClient()
 	if err != nil {
 		return webError(err, 503)
 	}
@@ -272,7 +296,7 @@ func runManagedWeb(c *gin.Context, info *relaycommon.RelayInfo, run func() *type
 	if plan == nil {
 		response, err := websearch.Alpha(c.Request.Context(), session, body)
 		if err != nil {
-			return webError(err, 502)
+			return managedToolError(c, err)
 		}
 		if err := prepareBill(); err != nil {
 			return webError(err, 503)
@@ -301,7 +325,7 @@ func runManagedWeb(c *gin.Context, info *relaycommon.RelayInfo, run func() *type
 			return webError(err, 403)
 		}
 		encoded := websearch.Raw(plan.Body)
-		if len(encoded) > 32<<20 {
+		if len(encoded) > managedWebBufferLimit {
 			return webError(errors.New("managed web tool history exceeds 32 MiB"), 413)
 		}
 		if replacement != nil {
@@ -392,7 +416,7 @@ func runManagedWeb(c *gin.Context, info *relaycommon.RelayInfo, run func() *type
 			executedIDs[call.ID] = true
 			e, err := plan.Execute(c.Request.Context(), session, call)
 			if err != nil {
-				return webError(err, 502)
+				return managedToolError(c, err)
 			}
 			executed = append(executed, e)
 		}
@@ -401,7 +425,7 @@ func runManagedWeb(c *gin.Context, info *relaycommon.RelayInfo, run func() *type
 			for _, part := range parts {
 				collectedBytes += len(part)
 			}
-			if collectedBytes > 32<<20 {
+			if collectedBytes > managedWebBufferLimit {
 				return webError(errors.New("managed web response history exceeds 32 MiB"), 502)
 			}
 			collected = append(collected, parts...)
@@ -538,7 +562,7 @@ func (w *webCapture) WriteHeader(n int)   { w.mu.Lock(); defer w.mu.Unlock(); w.
 func (w *webCapture) Write(b []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.buffer.Len()+len(b) > 32<<20 {
+	if w.buffer.Len()+len(b) > managedWebBufferLimit {
 		w.err = errors.New("managed web model response exceeds 32 MiB")
 		return 0, w.err
 	}
