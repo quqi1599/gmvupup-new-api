@@ -7735,7 +7735,7 @@
     "Estimated per-second price": "Đơn giá tham khảo theo giây",
     "Generate images from text or edit an uploaded reference image.": "Tạo ảnh từ văn bản hoặc chỉnh sửa ảnh tham chiếu đã tải lên.",
     "Generate images from text, edit reference images, or combine multiple references.": "Tạo ảnh từ văn bản, chỉnh sửa ảnh tham chiếu hoặc kết hợp nhiều ảnh tham chiếu.",
-    "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.": "Video đầu vào và đầu ra có cùng đơn giá theo giây. 5 ảnh đầu vào đầu tiên miễn phí, mỗi ảnh tiếp theo có giá {{price}}.",
+    "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.": "Cộng thời lượng video đầu vào và đầu ra, rồi nhân với đơn giá theo độ phân giải đầu ra. 5 ảnh đầu vào đầu tiên miễn phí, mỗi ảnh tiếp theo giá {{price}}. Âm thanh không tính phí riêng.",
     "Question answering, writing, coding assistance and image understanding.": "Hỏi đáp, viết nội dung, hỗ trợ lập trình và hiểu hình ảnh.",
     "Submit a Doubao video task and query the result by task ID.": "Gửi tác vụ video Doubao rồi truy vấn kết quả bằng ID tác vụ.",
     "Supports common ratios including 1:1, 16:9 and 9:16.": "Hỗ trợ các tỷ lệ phổ biến như 1:1, 16:9 và 9:16.",

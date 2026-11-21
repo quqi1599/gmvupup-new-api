@@ -7735,7 +7735,7 @@
     "Estimated per-second price": "Estimated per-second price",
     "Generate images from text or edit an uploaded reference image.": "Generate images from text or edit an uploaded reference image.",
     "Generate images from text, edit reference images, or combine multiple references.": "Generate images from text, edit reference images, or combine multiple references.",
-    "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.": "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.",
+    "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.": "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.",
     "Question answering, writing, coding assistance and image understanding.": "Question answering, writing, coding assistance and image understanding.",
     "Submit a Doubao video task and query the result by task ID.": "Submit a Doubao video task and query the result by task ID.",
     "Supports common ratios including 1:1, 16:9 and 9:16.": "Supports common ratios including 1:1, 16:9 and 9:16.",

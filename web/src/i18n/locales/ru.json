@@ -7735,7 +7735,7 @@
     "Estimated per-second price": "Ориентир за секунду",
     "Generate images from text or edit an uploaded reference image.": "Создание изображений по тексту и редактирование загруженного образца.",
     "Generate images from text, edit reference images, or combine multiple references.": "Создание изображений по тексту, редактирование образцов и использование нескольких образцов.",
-    "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.": "Для входного и выходного видео действует единый тариф за секунду. Первые 5 входных изображений бесплатны, далее — {{price}} за изображение.",
+    "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.": "Сложите длительность входного и выходного видео и умножьте на тариф выходного разрешения. Первые 5 изображений бесплатны, каждое следующее стоит {{price}}. За звук отдельной платы нет.",
     "Question answering, writing, coding assistance and image understanding.": "Ответы на вопросы, написание текстов, помощь с кодом и анализ изображений.",
     "Submit a Doubao video task and query the result by task ID.": "Отправьте задачу через API Doubao и получите результат по её идентификатору.",
     "Supports common ratios including 1:1, 16:9 and 9:16.": "Поддержка распространённых форматов, включая 1:1, 16:9 и 9:16.",

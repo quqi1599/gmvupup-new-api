@@ -85,7 +85,7 @@ export function VideoResolutionPrices(
       {props.extraImagePrice !== undefined && (
         <p className='text-muted-foreground text-xs'>
           {t(
-            'Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.',
+            'Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.',
             { price: props.extraImagePrice }
           )}
         </p>

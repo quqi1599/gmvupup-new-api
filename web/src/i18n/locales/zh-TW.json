@@ -7735,7 +7735,7 @@
     "Estimated per-second price": "參考秒價",
     "Generate images from text or edit an uploaded reference image.": "支援文字生成圖片和上傳參考圖編輯。",
     "Generate images from text, edit reference images, or combine multiple references.": "支援文字生成圖片、參考圖編輯和多圖參考創作。",
-    "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.": "輸入和輸出影片按同一秒價計費。前 5 張輸入圖片免費，超出每張 {{price}}。",
+    "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.": "影片費＝（參考影片總時長＋成片時長）× 輸出解析度秒價。前 5 張輸入圖片免費，超出部分每張 {{price}}。音訊不另收費。",
     "Question answering, writing, coding assistance and image understanding.": "支援問答、寫作、程式碼輔助和圖片理解。",
     "Submit a Doubao video task and query the result by task ID.": "透過豆包原生介面提交影片任務，再用任務 ID 查詢和下載結果。",
     "Supports common ratios including 1:1, 16:9 and 9:16.": "支援 1:1、16:9、9:16 等常用比例。",

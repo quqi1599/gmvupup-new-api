@@ -245,6 +245,10 @@ it('shows MiniMax H3 second prices with the input-video and extra-image charges'
   expect(screen.getByText('¥0.5')).toBeVisible()
   expect(screen.getByText('¥0.8')).toBeVisible()
   expect(screen.getByText(/first 5 input images.*¥0.2/)).toBeVisible()
+  expect(
+    screen.getByText(/multiply by the output resolution rate/)
+  ).toBeVisible()
+  expect(screen.getByText(/Audio has no separate charge/)).toBeVisible()
   expect(screen.getByText('Billed per second')).toBeVisible()
   expect(screen.queryByText('View details')).not.toBeInTheDocument()
 })

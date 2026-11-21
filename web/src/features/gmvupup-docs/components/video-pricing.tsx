@@ -36,15 +36,12 @@ import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 export function VideoPricing() {
   const { t } = useTranslation()
   const pricing = usePricingData()
-  const models = pricing.models.filter(isNativeSeedanceModel)
+  const models = pricing.models.filter(
+    (model) => isNativeSeedanceModel(model) || model.model_name === 'MiniMax-H3'
+  )
   return (
     <section id='pricing' className='gmv-doc-section'>
       <h2>{t('Current video pricing')}</h2>
-      <p className='gmv-doc-paragraph'>
-        {t(
-          'Per-second prices are estimates. Final charges use the returned video token usage and the applicable pricing tier and group.'
-        )}
-      </p>
       {pricing.isLoading && <LoadingState />}
       {pricing.error && (
         <ErrorState
@@ -85,9 +82,7 @@ export function VideoPricing() {
         ) : (
           <p>{t('Price pending configuration')}</p>
         ))}
-      <Link to='/pricing' search={{ search: 'doubao-seedance' }}>
-        {t('View live pricing')}
-      </Link>
+      <Link to='/pricing'>{t('View live pricing')}</Link>
     </section>
   )
 }

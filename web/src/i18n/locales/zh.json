@@ -7735,7 +7735,7 @@
     "Estimated per-second price": "参考秒价",
     "Generate images from text or edit an uploaded reference image.": "支持文字生图和上传参考图编辑。",
     "Generate images from text, edit reference images, or combine multiple references.": "支持文字生图、参考图编辑和多图参考创作。",
-    "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.": "输入和输出视频按同一秒价计费。前 5 张输入图片免费，超出每张 {{price}}。",
+    "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.": "视频费＝（参考视频总时长＋成片时长）× 输出分辨率秒价。前 5 张输入图片免费，超出部分每张 {{price}}。音频不另收费。",
     "Question answering, writing, coding assistance and image understanding.": "支持问答、写作、代码辅助和图片理解。",
     "Submit a Doubao video task and query the result by task ID.": "通过豆包原生接口提交视频任务，再用任务 ID 查询和下载结果。",
     "Supports common ratios including 1:1, 16:9 and 9:16.": "支持 1:1、16:9、9:16 等常用比例。",

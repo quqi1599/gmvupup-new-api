@@ -7735,7 +7735,7 @@
     "Estimated per-second price": "秒単価の目安",
     "Generate images from text or edit an uploaded reference image.": "テキストからの画像生成や、アップロードした参照画像の編集に対応します。",
     "Generate images from text, edit reference images, or combine multiple references.": "テキストからの画像生成、参照画像の編集、複数画像を使った生成に対応します。",
-    "Input and output video seconds are billed at the same rate. The first 5 input images are free, and each additional image costs {{price}}.": "入力・出力動画は同じ秒単価です。入力画像は5枚まで無料で、以降は1枚あたり{{price}}です。",
+    "Add the input and output video seconds, then multiply by the output resolution rate. The first 5 input images are free, and each additional image costs {{price}}. Audio has no separate charge.": "入力動画と出力動画の秒数を合計し、出力解像度の秒単価を掛けます。入力画像は5枚まで無料で、以降は1枚につき{{price}}です。音声の追加料金はありません。",
     "Question answering, writing, coding assistance and image understanding.": "質疑応答、文章作成、コーディング支援、画像理解に対応します。",
     "Submit a Doubao video task and query the result by task ID.": "Doubaoの動画生成タスクを送信し、タスクIDで結果を取得します。",
     "Supports common ratios including 1:1, 16:9 and 9:16.": "1:1、16:9、9:16などの一般的な比率に対応します。",
