@@ -225,7 +225,8 @@ export function formatDynamicUnitPrice(
 
 export function formatTaskUsageUnitPrice(
   valuePerUnit: number,
-  options: DynamicPriceOptions
+  options: DynamicPriceOptions,
+  fixedFractionDigits?: number
 ): string {
   const groupRatio = options.groupRatioMultiplier ?? 1
   const priceRate = options.priceRate ?? 1
@@ -242,6 +243,7 @@ export function formatTaskUsageUnitPrice(
     showSymbol: options.showCurrencySymbol ?? true,
     digitsLarge: 4,
     digitsSmall: 6,
+    fixedFractionDigits,
     abbreviate: false,
   })
 }

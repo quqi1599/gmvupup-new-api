@@ -321,8 +321,8 @@ describe('GMVUPUP documentation', () => {
     const router = await renderDocs('videos', true, [model])
     const table = screen.getAllByRole('table')[0]
     expect(within(table).getByText('doubao-seedance-2.5')).toBeVisible()
-    expect(within(table).getByText(/¥0\.53802/)).toBeVisible()
-    expect(within(table).getByText(/¥1\.2096/)).toBeVisible()
+    expect(within(table).getByText('¥0.5')).toBeVisible()
+    expect(within(table).getByText('¥1.2')).toBeVisible()
     await router.navigate({ to: '/docs/$topic', params: { topic: 'models' } })
     expect(await screen.findByText('doubao', { exact: true })).toBeVisible()
     expect(screen.queryByText('openai-video')).not.toBeInTheDocument()

@@ -139,9 +139,10 @@ it('shows Seedance second estimates across cards, cells and details while retain
     'second-details',
   ]) {
     const scope = within(screen.getByTestId(section))
-    expect(scope.getAllByText('¥0.53802').length).toBeGreaterThan(0)
-    expect(scope.getAllByText('¥1.2096').length).toBeGreaterThan(0)
-    expect(scope.getAllByText('¥0.72576').length).toBeGreaterThan(0)
+    for (const price of ['¥0.5', '¥0.3', '¥1.2', '¥0.7', '¥3.0', '¥1.8']) {
+      expect(scope.getAllByText(price).length).toBeGreaterThan(0)
+    }
+    expect(scope.queryByText('¥0.53802')).not.toBeInTheDocument()
     expect(scope.getAllByText('With reference video').length).toBeGreaterThan(0)
     expect(
       scope.queryByText(/1M token|Billing token unit price/i)
@@ -149,8 +150,7 @@ it('shows Seedance second estimates across cards, cells and details while retain
     expect(scope.getAllByText(/16:9.*24.*fps/i).length).toBeGreaterThan(0)
   }
   const details = within(screen.getByTestId('second-details'))
-  expect(details.getAllByText('¥0.72576').length).toBeGreaterThan(0)
-  expect(details.getByText('¥2.4192')).toBeVisible()
+  expect(details.getByText('¥2.4')).toBeVisible()
   await act(() => i18next.changeLanguage('zhCN'))
   expect(details.getAllByText('有参考视频').length).toBeGreaterThan(0)
   expect(details.getAllByText(/按16:9、24fps估算/).length).toBeGreaterThan(0)

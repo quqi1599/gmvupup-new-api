@@ -79,12 +79,13 @@ export function getVideoSecondPricing(
     ) {
       return null
     }
+    const modelName = getCustomerModelName(model)
+    const fixedFractionDigits = modelName === 'Seedance 2.5' ? 1 : undefined
     // Official 16:9 output sizes and 24 fps. 480p differs between 2.0 and 2.5.
     // https://docs.volcengine.com/docs/ark/video-generation-tutorial?lang=zh
     // https://docs.volcengine.com/docs/ark/model-pricing?lang=zh
     const pixels: Record<string, number> = {
-      '480p':
-        getCustomerModelName(model) === 'Seedance 2.0' ? 864 * 496 : 854 * 480,
+      '480p': modelName === 'Seedance 2.0' ? 864 * 496 : 854 * 480,
       '720p': 1280 * 720,
       '1080p': 1920 * 1080,
       '4k': 3840 * 2160,
@@ -118,7 +119,8 @@ export function getVideoSecondPricing(
         prices.push(
           formatTaskUsageUnitPrice(
             (rate * pixels[resolution] * 24) / 1024 / 1_000_000,
-            options
+            options,
+            fixedFractionDigits
           )
         )
       }
