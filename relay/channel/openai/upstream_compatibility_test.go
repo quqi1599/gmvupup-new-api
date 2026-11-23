@@ -126,6 +126,10 @@ func TestGPT6ChatCompatibility(t *testing.T) {
 		{"gpt-6.1-terra-high", "none", "gpt-6.1-terra", false},
 		{"gpt-6.1-terra-none", "high", "gpt-6.1-terra", true},
 		{"gpt-6.1-terra-2026-10-28", "none", "gpt-6.1-terra-2026-10-28", true},
+		{"gpt-6.2-astra", "", "gpt-6.2-astra", false},
+		{"gpt-6.2-astra-none", "high", "gpt-6.2-astra", false},
+		{"gpt-6.2-sol", "none", "gpt-6.2-sol", false},
+		{"gpt-6.2-sol-2026-11-18-high", "", "gpt-6.2-sol-2026-11-18", false},
 	} {
 		t.Run(tt.model+"/"+tt.effort, func(t *testing.T) {
 			for _, channelType := range []int{constant.ChannelTypeOpenAI, constant.ChannelTypeAzure} {
@@ -160,24 +164,26 @@ func TestChatLimitPresenceCompatibility(t *testing.T) {
 		{`,"max_tokens":32,"max_completion_tokens":0`, `{"max_completion_tokens":0}`},
 		{`,"max_tokens":32,"max_completion_tokens":8`, `{"max_completion_tokens":8}`},
 	} {
-		t.Run(tt.fields, func(t *testing.T) {
-			c, _ := setupOpenAITestContext()
-			info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI, UpstreamModelName: "gpt-6-sol"}}
-			var req dto.GeneralOpenAIRequest
-			require.NoError(t, common.UnmarshalJsonStr(`{"model":"gpt-6-sol"`+tt.fields+`}`, &req))
-			_, err := (&Adaptor{}).ConvertOpenAIRequest(c, info, &req)
-			require.NoError(t, err)
-			got := req.ToMap()
-			delete(got, "model")
-			encoded, err := common.Marshal(got)
-			require.NoError(t, err)
-			require.JSONEq(t, tt.want, string(encoded))
-		})
+		for _, modelName := range []string{"gpt-6-sol", "gpt-6.2-astra", "gpt-6.2-sol"} {
+			t.Run(modelName+"/"+tt.fields, func(t *testing.T) {
+				c, _ := setupOpenAITestContext()
+				info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI, UpstreamModelName: modelName}}
+				var req dto.GeneralOpenAIRequest
+				require.NoError(t, common.UnmarshalJsonStr(`{"model":"`+modelName+`"`+tt.fields+`}`, &req))
+				_, err := (&Adaptor{}).ConvertOpenAIRequest(c, info, &req)
+				require.NoError(t, err)
+				got := req.ToMap()
+				delete(got, "model")
+				encoded, err := common.Marshal(got)
+				require.NoError(t, err)
+				require.JSONEq(t, tt.want, string(encoded))
+			})
+		}
 	}
 }
 
 func TestChatUnknownMappedModelCompatibility(t *testing.T) {
-	for _, modelName := range []string{"qwen3.8-max", "ollama-model", "gpt-6-sol-custom", "gpt-6-sol-invalid-high", "gpt-6.1-sol-custom", "gpt-6.1-terra-2026-99-99"} {
+	for _, modelName := range []string{"qwen3.8-max", "ollama-model", "gpt-6-sol-custom", "gpt-6-sol-invalid-high", "gpt-6.1-sol-custom", "gpt-6.1-terra-2026-99-99", "gpt-6.2-sol-custom", "gpt-6.2-astra-2026-99-99"} {
 		c, _ := setupOpenAITestContext()
 		info := &relaycommon.RelayInfo{OriginModelName: "gpt-6-sol", ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI, UpstreamModelName: modelName}}
 		req := &dto.GeneralOpenAIRequest{Model: modelName, MaxTokens: common.GetPointer(uint(8)), Temperature: common.GetPointer(0.0), TopP: common.GetPointer(0.0), Messages: []dto.Message{{Role: "system", Content: "instruction"}}}

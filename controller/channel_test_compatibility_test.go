@@ -11,7 +11,7 @@ import (
 )
 
 func TestChannelProbeGPT6Compatibility(t *testing.T) {
-	for _, modelName := range []string{"gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6-luna-high", "gpt-6-sol-2026-09-03", "gpt-5.2"} {
+	for _, modelName := range []string{"gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6-luna-high", "gpt-6-sol-2026-09-03", "gpt-5.2", "gpt-6.2-astra", "gpt-6.2-sol-2026-11-18-high"} {
 		for _, endpoint := range []string{"", string(constant.EndpointTypeOpenAI)} {
 			for _, stream := range []bool{false, true} {
 				t.Run(modelName+"/"+endpoint+"/"+map[bool]string{false: "nonstream", true: "stream"}[stream], func(t *testing.T) {

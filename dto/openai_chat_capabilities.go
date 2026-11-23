@@ -28,7 +28,8 @@ func GetOpenAIChatCapabilities(modelName, effort string) OpenAIChatCapabilities 
 	isGPT5 := modelName == "gpt-5" || strings.HasPrefix(modelName, "gpt-5-") || strings.HasPrefix(modelName, "gpt-5.")
 	isSolLuna := isOpenAIModelSnapshot(modelName, "gpt-6-sol") || isOpenAIModelSnapshot(modelName, "gpt-6-luna")
 	isGPT61Terra := isOpenAIModelSnapshot(modelName, "gpt-6.1-terra")
-	if !isGPT5 && !isSolLuna && !isGPT61Terra && !isOpenAIModelSnapshot(modelName, "gpt-6-astra") && !isOpenAIModelSnapshot(modelName, "gpt-6.1-sol") {
+	isGPT62 := isOpenAIModelSnapshot(modelName, "gpt-6.2-astra") || isOpenAIModelSnapshot(modelName, "gpt-6.2-sol")
+	if !isGPT5 && !isSolLuna && !isGPT61Terra && !isGPT62 && !isOpenAIModelSnapshot(modelName, "gpt-6-astra") && !isOpenAIModelSnapshot(modelName, "gpt-6.1-sol") {
 		return caps
 	}
 	caps.UseMaxCompletionTokens = true
@@ -36,7 +37,7 @@ func GetOpenAIChatCapabilities(modelName, effort string) OpenAIChatCapabilities 
 	sampling := false
 	if effort == "" || effort == "none" {
 		// GPT-6.1 Terra defaults to medium; only explicit none allows sampling.
-		// GPT-6.1 Sol, like Astra, does not support sampling at any effort.
+		// GPT-6 Astra, GPT-6.1 Sol and both GPT-6.2 models never allow sampling.
 		sampling = isSolLuna || (isGPT61Terra && effort == "none")
 		for _, base := range []string{"gpt-5.1", "gpt-5.2", "gpt-5.4"} {
 			if isOpenAIModelSnapshot(modelName, base) {
