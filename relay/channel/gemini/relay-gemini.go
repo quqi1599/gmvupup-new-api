@@ -131,9 +131,12 @@ func clampThinkingBudgetByEffort(modelName string, effort string) int {
 	return clampThinkingBudget(modelName, maxBudget)
 }
 
-func ThinkingAdaptor(geminiRequest *dto.GeminiChatRequest, info *relaycommon.RelayInfo, oaiRequest ...dto.GeneralOpenAIRequest) {
+func ThinkingAdaptor(geminiRequest *dto.GeminiChatRequest, info *relaycommon.RelayInfo, oaiRequest ...dto.GeneralOpenAIRequest) error {
 	if model_setting.GetGeminiSettings().ThinkingAdapterEnabled {
 		modelName := info.UpstreamModelName
+		if strings.HasPrefix(modelName, "gemini-4-") {
+			return applyGemini4Effort(geminiRequest, info, oaiRequest...)
+		}
 		isNew25Pro := strings.HasPrefix(modelName, "gemini-2.5-pro") &&
 			!strings.HasPrefix(modelName, "gemini-2.5-pro-preview-05-06") &&
 			!strings.HasPrefix(modelName, "gemini-2.5-pro-preview-03-25")
@@ -195,6 +198,7 @@ func ThinkingAdaptor(geminiRequest *dto.GeminiChatRequest, info *relaycommon.Rel
 			info.ReasoningEffort = level
 		}
 	}
+	return nil
 }
 
 // Setting safety to the lowest possible values since Gemini is already powerless enough
@@ -207,15 +211,17 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		},
 	}
 
-	if textRequest.TopP != nil && *textRequest.TopP > 0 {
+	if textRequest.TopP != nil {
 		geminiRequest.GenerationConfig.TopP = common.GetPointer(*textRequest.TopP)
 	}
 
 	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
 		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(maxTokens)
+	} else if textRequest.MaxTokens != nil || textRequest.MaxCompletionTokens != nil {
+		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(uint(0))
 	}
 
-	if textRequest.Seed != nil && *textRequest.Seed != 0 {
+	if textRequest.Seed != nil {
 		geminiSeed := int64(lo.FromPtr(textRequest.Seed))
 		geminiRequest.GenerationConfig.Seed = common.GetPointer(geminiSeed)
 	}
@@ -353,7 +359,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 	}
 
 	if !adaptorWithExtraBody {
-		ThinkingAdaptor(&geminiRequest, info, textRequest)
+		if err := ThinkingAdaptor(&geminiRequest, info, textRequest); err != nil {
+			return nil, err
+		}
 	}
 
 	safetySettings := make([]dto.GeminiChatSafetySettings, 0, len(SafetySettingList))
