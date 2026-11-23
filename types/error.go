@@ -242,7 +242,15 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 		if openAIError, ok := e.RelayError.(OpenAIError); ok {
 			result = ClaudeError{
 				Message: e.Error(),
-				Type:    fmt.Sprintf("%v", openAIError.Code),
+				Type:    openAIError.Type,
+			}
+			if result.Type == string(ErrorTypeUpstreamError) {
+				if code, ok := openAIError.Code.(string); ok {
+					switch code {
+					case "invalid_request_error", "authentication_error", "billing_error", "permission_error", "not_found_error", "conflict_error", "request_too_large", "rate_limit_error", "api_error", "timeout_error", "overloaded_error":
+						result.Type = code
+					}
+				}
 			}
 		}
 	case ErrorTypeClaudeError:

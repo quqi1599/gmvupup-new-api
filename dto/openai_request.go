@@ -289,10 +289,11 @@ func (r *GeneralOpenAIRequest) GetSystemRoleName() string {
 const CustomType = "custom"
 
 type ToolCallRequest struct {
-	ID       string          `json:"id,omitempty"`
-	Type     string          `json:"type"`
-	Function FunctionRequest `json:"function,omitempty"`
-	Custom   json.RawMessage `json:"custom,omitempty"`
+	CacheControl json.RawMessage `json:"cache_control,omitempty"`
+	ID           string          `json:"id,omitempty"`
+	Type         string          `json:"type"`
+	Function     FunctionRequest `json:"function,omitempty"`
+	Custom       json.RawMessage `json:"custom,omitempty"`
 }
 
 type FunctionRequest struct {
@@ -647,6 +648,7 @@ func (m *Message) ParseContent() []MediaContent {
 			continue
 		}
 
+		before := len(contentList)
 		switch contentType {
 		case ContentTypeText:
 			if text, ok := contentItem["text"].(string); ok {
@@ -710,6 +712,10 @@ func (m *Message) ParseContent() []MediaContent {
 					},
 				})
 			}
+		}
+		if len(contentList) > before && contentItem["cache_control"] != nil {
+			// Preserve an explicit breakpoint on this block only.
+			contentList[before].CacheControl, _ = common.Marshal(contentItem["cache_control"])
 		}
 	}
 
