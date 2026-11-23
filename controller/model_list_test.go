@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
@@ -152,6 +153,61 @@ func pricingByModelName(pricings []model.Pricing) map[string]model.Pricing {
 		byName[pricing.ModelName] = pricing
 	}
 	return byName
+}
+
+func TestPricingGroupLabelsByViewer(t *testing.T) {
+	oldDB, oldLogDB, oldRedis := model.DB, model.LOG_DB, common.RedisEnabled
+	oldSQLite, oldMySQL, oldPostgres := common.UsingSQLite, common.UsingMySQL, common.UsingPostgreSQL
+	oldGroups := setting.UserUsableGroups2JSONString()
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB, common.RedisEnabled = oldDB, oldLogDB, oldRedis
+		common.UsingSQLite, common.UsingMySQL, common.UsingPostgreSQL = oldSQLite, oldMySQL, oldPostgres
+		require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(oldGroups))
+		model.InvalidatePricingCache()
+	})
+	db := setupModelListControllerTestDB(t)
+	require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(`{"default":"Public"}`))
+	member := model.User{Username: "pricing-member", Group: "team", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&member).Error)
+	require.NoError(t, db.Create(&[]model.Ability{
+		{Model: "mixed", Group: "default", ChannelId: 1, Enabled: true},
+		{Model: "mixed", Group: "team", ChannelId: 1, Enabled: true},
+		{Model: "wildcard", Group: "all", ChannelId: 1, Enabled: true},
+		{Model: "wildcard", Group: "team", ChannelId: 1, Enabled: true},
+		{Model: "team-only", Group: "team", ChannelId: 1, Enabled: true},
+	}).Error)
+	model.InvalidatePricingCache()
+
+	view := func(userID int) map[string]model.Pricing {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/api/pricing", nil)
+		if userID != 0 {
+			ctx.Set("id", userID)
+		}
+		GetPricing(ctx)
+		require.Equal(t, http.StatusOK, recorder.Code)
+		var body struct {
+			Success bool            `json:"success"`
+			Data    []model.Pricing `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &body))
+		require.True(t, body.Success)
+		return pricingByModelName(body.Data)
+	}
+	guest := view(0)
+	require.Equal(t, []string{"default"}, guest["mixed"].EnableGroup)
+	require.Equal(t, []string{"all"}, guest["wildcard"].EnableGroup)
+	require.NotContains(t, guest, "team-only")
+	// Reading as a guest must not change the shared cache used for the member.
+	team := view(member.Id)
+	require.ElementsMatch(t, []string{"default", "team"}, team["mixed"].EnableGroup)
+	require.ElementsMatch(t, []string{"all", "team"}, team["wildcard"].EnableGroup)
+	require.Equal(t, []string{"team"}, team["team-only"].EnableGroup)
+	require.Equal(t, guest, view(0))
+	require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(`{}`))
+	require.Empty(t, view(0))
 }
 
 func TestListModelsIncludesTieredBillingModel(t *testing.T) {
