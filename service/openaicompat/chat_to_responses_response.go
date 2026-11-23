@@ -83,12 +83,13 @@ func ChatCompletionsResponseToResponsesResponse(resp *dto.OpenAITextResponse, id
 			return nil, nil, fmt.Errorf("marshal function arguments: %w", err)
 		}
 		out.Output = append(out.Output, dto.ResponsesOutput{
-			Type:      "function_call",
-			ID:        callID,
-			Status:    responsesOutputStatus(status),
-			CallId:    callID,
-			Name:      toolCall.Function.Name,
-			Arguments: arguments,
+			Type:         "function_call",
+			ID:           callID,
+			Status:       responsesOutputStatus(status),
+			CallId:       callID,
+			ExtraContent: toolCall.ExtraContent,
+			Name:         toolCall.Function.Name,
+			Arguments:    arguments,
 		})
 	}
 	return out, usage, nil
@@ -113,6 +114,10 @@ func responsesUsageFromChat(src *dto.Usage) *dto.Usage {
 	if usage.InputTokensDetails == nil {
 		details := usage.PromptTokensDetails
 		usage.InputTokensDetails = &details
+	}
+	if usage.OutputTokensDetails == nil {
+		details := usage.CompletionTokenDetails
+		usage.OutputTokensDetails = &details
 	}
 	return usage
 }
@@ -194,12 +199,13 @@ type ChatToResponsesStreamState struct {
 }
 
 type chatToResponsesStreamTool struct {
-	ChatIndex   int
-	OutputIndex int
-	ID          string
-	Name        string
-	Arguments   strings.Builder
-	Done        bool
+	ExtraContent *dto.GoogleToolExtra
+	ChatIndex    int
+	OutputIndex  int
+	ID           string
+	Name         string
+	Arguments    strings.Builder
+	Done         bool
 }
 
 type chatToResponsesOutputRef struct {
@@ -349,14 +355,18 @@ func (s *ChatToResponsesStreamState) appendToolCallDelta(toolCall dto.ToolCallRe
 			tool.ID = fmt.Sprintf("%s_call_%d", s.ID, chatIndex)
 		}
 		s.toolsByIndex[chatIndex] = tool
+		tool.ExtraContent = toolCall.ExtraContent
 		emptyArguments, _ := common.Marshal("")
 		events = append(events, s.event(responsesEventOutputItemAdded, dto.ResponsesStreamResponse{
 			OutputIndex: intPointer(tool.OutputIndex), ItemID: tool.ID,
-			Item: &dto.ResponsesOutput{Type: "function_call", ID: tool.ID, Status: "in_progress", CallId: tool.ID, Name: tool.Name, Arguments: emptyArguments},
+			Item: &dto.ResponsesOutput{Type: "function_call", ID: tool.ID, Status: "in_progress", CallId: tool.ID, Name: tool.Name, Arguments: emptyArguments, ExtraContent: tool.ExtraContent},
 		}))
 	}
 	if toolCall.ID != "" {
 		tool.ID = toolCall.ID
+	}
+	if toolCall.ExtraContent != nil {
+		tool.ExtraContent = toolCall.ExtraContent
 	}
 	if toolCall.Function.Name != "" {
 		tool.Name = toolCall.Function.Name
@@ -377,7 +387,7 @@ func (s *ChatToResponsesStreamState) doneDeltaEvents() []ChatToResponsesStreamEv
 		s.textDone = true
 		s.closedMessages = append(s.closedMessages, *s.messageOutput(status))
 		events = append(events,
-			s.event("response.output_text.done", dto.ResponsesStreamResponse{OutputIndex: intPointer(s.textOutputIndex), ContentIndex: intPointer(0), ItemID: s.messageID()}),
+			s.event("response.output_text.done", dto.ResponsesStreamResponse{OutputIndex: intPointer(s.textOutputIndex), ContentIndex: intPointer(0), ItemID: s.messageID(), Text: common.GetPointer(s.text.String())}),
 			s.event(responsesEventOutputItemDone, dto.ResponsesStreamResponse{OutputIndex: intPointer(s.textOutputIndex), Item: s.messageOutput(status)}),
 		)
 	}
@@ -387,6 +397,7 @@ func (s *ChatToResponsesStreamState) doneDeltaEvents() []ChatToResponsesStreamEv
 		events = append(events,
 			s.event(responsesEventReasoningSummaryDone, dto.ResponsesStreamResponse{
 				OutputIndex: intPointer(s.reasoningIndex), SummaryIndex: intPointer(0), ItemID: s.reasoningID(),
+				Text: common.GetPointer(s.reasoning.String()),
 				Part: &dto.ResponsesReasoningSummaryPart{Type: "summary_text", Text: s.reasoning.String()},
 			}),
 			s.event("response.reasoning_summary_part.done", dto.ResponsesStreamResponse{
@@ -487,7 +498,7 @@ func (s *ChatToResponsesStreamState) reasoningOutput(status string) *dto.Respons
 
 func (s *ChatToResponsesStreamState) toolOutput(tool *chatToResponsesStreamTool, status string) *dto.ResponsesOutput {
 	arguments, _ := common.Marshal(tool.Arguments.String())
-	return &dto.ResponsesOutput{Type: "function_call", ID: tool.ID, Status: status, CallId: tool.ID, Name: tool.Name, Arguments: arguments}
+	return &dto.ResponsesOutput{Type: "function_call", ID: tool.ID, Status: status, CallId: tool.ID, Name: tool.Name, Arguments: arguments, ExtraContent: tool.ExtraContent}
 }
 
 func intPointer(value int) *int { return &value }

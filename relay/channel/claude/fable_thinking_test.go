@@ -1,12 +1,14 @@
 package claude
 
 import (
+	"testing"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/types"
+
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
-	"testing"
 )
 
 func TestFableAdaptiveThinking(t *testing.T) {

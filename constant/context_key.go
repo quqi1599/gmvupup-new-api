@@ -27,6 +27,7 @@ const (
 	ContextKeyRequestControlsDiagnostic  ContextKey = "request_controls_diagnostic"
 	ContextKeyWebSearchMode              ContextKey = "web_search_mode"
 	ContextKeyUpstreamRequestStream      ContextKey = "upstream_request_stream"
+	ContextKeyResponsesBackground        ContextKey = "responses_background_requested"
 
 	/* token related keys */
 	ContextKeyTokenUnlimited         ContextKey = "token_unlimited_quota"

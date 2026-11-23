@@ -1,10 +1,12 @@
 package gemini
 
 import (
+	"testing"
+
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestGemini4ThinkingLevels(t *testing.T) {

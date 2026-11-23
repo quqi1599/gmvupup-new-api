@@ -20,6 +20,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/openaicompat"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
@@ -203,6 +204,10 @@ func ThinkingAdaptor(geminiRequest *dto.GeminiChatRequest, info *relaycommon.Rel
 
 // Setting safety to the lowest possible values since Gemini is already powerless enough
 func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, info *relaycommon.RelayInfo) (*dto.GeminiChatRequest, error) {
+	return convertChatToGemini(c, textRequest, info, false)
+}
+
+func convertChatToGemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, info *relaycommon.RelayInfo, responsesPivot bool) (*dto.GeminiChatRequest, error) {
 
 	geminiRequest := dto.GeminiChatRequest{
 		Contents: make([]dto.GeminiChatContent, 0, len(textRequest.Messages)),
@@ -215,10 +220,10 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		geminiRequest.GenerationConfig.TopP = common.GetPointer(*textRequest.TopP)
 	}
 
-	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
-		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(maxTokens)
-	} else if textRequest.MaxTokens != nil || textRequest.MaxCompletionTokens != nil {
-		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(uint(0))
+	if textRequest.MaxCompletionTokens != nil {
+		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(*textRequest.MaxCompletionTokens)
+	} else if textRequest.MaxTokens != nil {
+		geminiRequest.GenerationConfig.MaxOutputTokens = common.GetPointer(*textRequest.MaxTokens)
 	}
 
 	if textRequest.Seed != nil {
@@ -228,7 +233,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 
 	attachThoughtSignature := (info.ChannelType == constant.ChannelTypeGemini ||
 		info.ChannelType == constant.ChannelTypeVertexAi) &&
-		model_setting.GetGeminiSettings().FunctionCallThoughtSignatureEnabled
+		model_setting.GetGeminiSettings().FunctionCallThoughtSignatureEnabled && !responsesPivot
 
 	if model_setting.IsGeminiModelSupportImagine(info.UpstreamModelName) {
 		geminiRequest.GenerationConfig.ResponseModalities = []string{
@@ -256,7 +261,6 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		// eg. {"google":{"thinking_config":{"thinking_budget":5324,"include_thoughts":true}}}
 		if googleBody, ok := extraBody["google"].(map[string]interface{}); ok {
 			if !strings.HasSuffix(info.UpstreamModelName, "-nothinking") {
-				adaptorWithExtraBody = true
 				// check error param name like thinkingConfig, should be thinking_config
 				if _, hasErrorParam := googleBody["thinkingConfig"]; hasErrorParam {
 					return nil, errors.New("extra_body.google.thinkingConfig is not supported, use extra_body.google.thinking_config instead")
@@ -306,6 +310,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					}
 
 					if hasThinkingConfig {
+						adaptorWithExtraBody = true
 						// 避免 panic: 仅在获得配置时分配，防止后续赋值时空指针
 						if geminiRequest.GenerationConfig.ThinkingConfig == nil {
 							geminiRequest.GenerationConfig.ThinkingConfig = &tempThinkingConfig
@@ -475,15 +480,21 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			contentStr := message.StringContent()
 
 			// 1. 尝试解析为 JSON 对象
-			if err := json.Unmarshal([]byte(contentStr), &contentMap); err != nil {
+			var rawFields map[string]json.RawMessage
+			if err := common.Unmarshal([]byte(contentStr), &rawFields); err != nil || rawFields == nil {
 				// 2. 如果失败，尝试解析为 JSON 数组
-				var contentSlice []interface{}
-				if err := json.Unmarshal([]byte(contentStr), &contentSlice); err == nil {
+				var contentSlice []json.RawMessage
+				if err := common.Unmarshal([]byte(contentStr), &contentSlice); err == nil && contentSlice != nil {
 					// 如果是数组，包装成对象
 					contentMap = map[string]interface{}{"result": contentSlice}
 				} else {
 					// 3. 如果再次失败，作为纯文本处理
 					contentMap = map[string]interface{}{"content": contentStr}
+				}
+			} else {
+				contentMap = make(map[string]any, len(rawFields))
+				for k, v := range rawFields {
+					contentMap[k] = v
 				}
 			}
 
@@ -491,13 +502,16 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 				Name:     name,
 				Response: contentMap,
 			}
+			if responsesPivot && message.ToolCallId != "" {
+				functionResp.ID, _ = common.Marshal(message.ToolCallId)
+			}
 
 			*parts = append(*parts, dto.GeminiPart{
 				FunctionResponse: functionResp,
 			})
 			continue
 		}
-		var parts []dto.GeminiPart
+		var parts, pendingCalls []dto.GeminiPart
 		content := dto.GeminiChatContent{
 			Role: message.Role,
 		}
@@ -508,10 +522,10 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			// message.Role = "model"
 			// isToolCall = true
 			for _, call := range message.ParseToolCalls() {
-				args := map[string]interface{}{}
+				args := map[string]json.RawMessage{}
 				if call.Function.Arguments != "" {
-					if json.Unmarshal([]byte(call.Function.Arguments), &args) != nil {
-						return nil, fmt.Errorf("invalid arguments for function %s, args: %s", call.Function.Name, call.Function.Arguments)
+					if common.Unmarshal([]byte(call.Function.Arguments), &args) != nil || args == nil {
+						return nil, geminiInvalid("function arguments must be a JSON object")
 					}
 				}
 				toolCall := dto.GeminiPart{
@@ -520,17 +534,32 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 						Arguments:    args,
 					},
 				}
+				if responsesPivot {
+					toolCall.FunctionCall.ID = call.ID
+				}
+				if call.ExtraContent != nil && common.GetJsonType(call.ExtraContent.Google.ThoughtSignature) == "string" {
+					toolCall.ThoughtSignature = call.ExtraContent.Google.ThoughtSignature
+					signatureAttached = true
+				}
 				if shouldAttachThoughtSignature && !signatureAttached && hasFunctionCallContent(toolCall.FunctionCall) && len(toolCall.ThoughtSignature) == 0 {
 					toolCall.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
 					signatureAttached = true
 				}
-				parts = append(parts, toolCall)
+				if responsesPivot {
+					pendingCalls = append(pendingCalls, toolCall)
+				} else {
+					parts = append(parts, toolCall)
+				}
 				tool_call_ids[call.ID] = call.Function.Name
 			}
 		}
 
 		openaiContent := message.ParseContent()
 		for _, part := range openaiContent {
+			if responsesPivot && message.Role == "assistant" && part.Type == openaicompat.GeminiThoughtPart {
+				parts = append(parts, dto.GeminiPart{Text: part.Text, Thought: true})
+				continue
+			}
 			if part.Type == dto.ContentTypeText {
 				if part.Text == "" {
 					continue
@@ -592,6 +621,8 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					parts = append(parts, dto.GeminiPart{
 						Text: part.Text,
 					})
+				} else if text != "" {
+					parts = append(parts, dto.GeminiPart{Text: text})
 				}
 			} else {
 				source := part.ToFileSource()
@@ -628,14 +659,19 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			}
 		}
 
-		content.Parts = parts
+		content.Parts = append(parts, pendingCalls...)
 
 		// there's no assistant role in gemini and API shall vomit if Role is not user or model
 		if content.Role == "assistant" {
 			content.Role = "model"
 		}
 		if len(content.Parts) > 0 {
-			geminiRequest.Contents = append(geminiRequest.Contents, content)
+			contents := geminiRequest.Contents
+			if responsesPivot && content.Role == "model" && len(contents) > 0 && contents[len(contents)-1].Role == "model" {
+				contents[len(contents)-1].Parts = append(contents[len(contents)-1].Parts, content.Parts...)
+			} else {
+				geminiRequest.Contents = append(contents, content)
+			}
 		}
 	}
 
@@ -1000,18 +1036,24 @@ func unescapeMapOrSlice(data interface{}) interface{} {
 }
 
 func getResponseToolCall(item *dto.GeminiPart) *dto.ToolCallResponse {
-	var argsBytes []byte
-	var err error
-	// 移除 unescapeMapOrSlice 调用，直接使用 json.Marshal
-	// JSON 序列化/反序列化已经正确处理了转义字符
-	argsBytes, err = json.Marshal(item.FunctionCall.Arguments)
+	argsBytes, err := common.Marshal(item.FunctionCall.Arguments)
 
 	if err != nil {
 		return nil
 	}
+	id := item.FunctionCall.ID
+	if id == "" {
+		id = "call_" + common.GetUUID()
+	}
+	var extra *dto.GoogleToolExtra
+	if common.GetJsonType(item.ThoughtSignature) == "string" {
+		extra = &dto.GoogleToolExtra{}
+		extra.Google.ThoughtSignature = item.ThoughtSignature
+	}
 	return &dto.ToolCallResponse{
-		ID:   fmt.Sprintf("call_%s", common.GetUUID()),
-		Type: "function",
+		ID:           id,
+		ExtraContent: extra,
+		Type:         "function",
 		Function: dto.FunctionResponse{
 			Arguments: string(argsBytes),
 			Name:      item.FunctionCall.FunctionName,
@@ -1120,7 +1162,7 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	terminal := false
 	reportedUsage := false
 	expected := 1
-	if req, ok := info.Request.(*dto.GeminiChatRequest); ok && req.GenerationConfig.CandidateCount != nil && *req.GenerationConfig.CandidateCount > 1 {
+	if req, ok := info.Request.(*dto.GeminiChatRequest); ok && req != nil && req.GenerationConfig.CandidateCount != nil && *req.GenerationConfig.CandidateCount > 1 {
 		expected = *req.GenerationConfig.CandidateCount
 	}
 
@@ -1285,9 +1327,13 @@ func geminiWriteError(c *gin.Context, info *relaycommon.RelayInfo, err error) *t
 
 func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	defer service.CloseResponseBodyGracefully(resp)
+	target := info.RelayFormat
+	if info.RelayMode == relayconstant.RelayModeResponses {
+		target = types.RelayFormatOpenAIResponses
+	}
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 	}
 	if common.DebugEnabled {
 		println(string(responseBody))
@@ -1295,7 +1341,7 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 	var geminiResponse dto.GeminiChatResponse
 	err = common.Unmarshal(responseBody, &geminiResponse)
 	if err != nil {
-		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 	}
 	if len(geminiResponse.Candidates) == 0 {
 		usage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
@@ -1317,9 +1363,12 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 			)
 		}
 
+		if target == types.RelayFormatOpenAIResponses {
+			return &usage, types.NewError(newAPIError, newAPIError.GetErrorCode(), types.ErrOptionWithSkipRetry())
+		}
 		service.ResetStatusCode(newAPIError, c.GetString("status_code_mapping"))
 
-		switch info.RelayFormat {
+		switch target {
 		case types.RelayFormatClaude:
 			c.JSON(newAPIError.StatusCode, gin.H{
 				"type":  "error",
@@ -1332,13 +1381,36 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		}
 		return &usage, nil
 	}
+	if target != types.RelayFormatGemini {
+		if target == types.RelayFormatOpenAIResponses && len(geminiResponse.Candidates) != 1 {
+			return nil, geminiBadResult("expected one Gemini candidate for Responses")
+		}
+		var outcome geminiOutcome
+		if _, bad := outcome.observe(&geminiResponse, false); bad != nil {
+			return nil, bad
+		}
+		if target == types.RelayFormatOpenAIResponses && len(outcome.ended) != 1 {
+			return nil, geminiBadResult("missing Gemini finish reason for Responses")
+		}
+	}
 	fullTextResponse := responseGeminiChat2OpenAI(c, &geminiResponse)
 	fullTextResponse.Model = info.UpstreamModelName
 	usage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
 
 	fullTextResponse.Usage = usage
 
-	switch info.RelayFormat {
+	switch target {
+	case types.RelayFormatOpenAIResponses:
+		result, _, convertErr := service.ChatCompletionsResponseToResponsesResponse(fullTextResponse, geminiResponseID(c))
+		if convertErr != nil {
+			return nil, geminiBadResult("could not convert Gemini response")
+		}
+		decorateGeminiResponse(info, result)
+		info.ObserveResponsesTerminal("", result)
+		responseBody, err = common.Marshal(result)
+		if err != nil {
+			return nil, geminiBadResult("could not encode Gemini response")
+		}
 	case types.RelayFormatOpenAI:
 		responseBody, err = common.Marshal(fullTextResponse)
 		if err != nil {

@@ -16,6 +16,18 @@ import (
 // Responses and Chat Completions APIs. It is intentionally provider-neutral;
 // Claude-specific defaults and media loading remain in the Claude adaptor.
 func ResponsesRequestToChatCompletionsRequest(req *dto.OpenAIResponsesRequest) (*dto.GeneralOpenAIRequest, error) {
+	return responsesToChatPivot(req, false)
+}
+
+// Gemini can retain returned summary text as model thought parts when the
+// client resubmits its complete response.output, without inventing a signature.
+const GeminiThoughtPart = "internal_gemini_thought"
+
+func ResponsesToGeminiPivot(req *dto.OpenAIResponsesRequest) (*dto.GeneralOpenAIRequest, error) {
+	return responsesToChatPivot(req, true)
+}
+
+func responsesToChatPivot(req *dto.OpenAIResponsesRequest, gemini bool) (*dto.GeneralOpenAIRequest, error) {
 	if req == nil {
 		return nil, errors.New("request is nil")
 	}
@@ -90,7 +102,7 @@ func ResponsesRequestToChatCompletionsRequest(req *dto.OpenAIResponsesRequest) (
 		return out, nil
 	}
 	var input any
-	if err := common.Unmarshal(req.Input, &input); err != nil {
+	if err := common.UnmarshalWithNumbers(req.Input, &input); err != nil {
 		return nil, fmt.Errorf("invalid input: %w", err)
 	}
 	switch value := input.(type) {
@@ -116,6 +128,30 @@ func ResponsesRequestToChatCompletionsRequest(req *dto.OpenAIResponsesRequest) (
 				return nil, fmt.Errorf("input item %d must be an object", index)
 			}
 			itemType, _ := itemMap["type"].(string)
+			if gemini && itemType == "reasoning" {
+				flushMedia()
+				summary, ok := itemMap["summary"].([]any)
+				if !ok || itemMap["encrypted_content"] != nil {
+					return nil, errors.New("cannot convert opaque reasoning history")
+				}
+				msg := dto.Message{Role: "assistant"}
+				var parts []dto.MediaContent
+				for _, v := range summary {
+					part, ok := v.(map[string]any)
+					text, hasText := part["text"].(string)
+					if !ok || part["type"] != "summary_text" || !hasText {
+						return nil, errors.New("invalid reasoning summary")
+					}
+					if text != "" {
+						parts = append(parts, dto.MediaContent{Type: GeminiThoughtPart, Text: text})
+					}
+				}
+				if len(parts) > 0 {
+					msg.SetMediaContent(parts)
+					out.Messages = append(out.Messages, msg)
+				}
+				continue
+			}
 			if itemType == "function_call_output" || itemType == "custom_tool_call_output" {
 				text, media, err := responsesToolOutputToChat(itemMap["output"])
 				if err != nil {

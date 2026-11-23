@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
@@ -158,10 +159,19 @@ func exceedsMaxTokensLimit(values ...*uint) bool {
 }
 
 func GetAndValidateResponsesRequest(c *gin.Context) (*dto.OpenAIResponsesRequest, error) {
-	request := &dto.OpenAIResponsesRequest{}
-	err := common.UnmarshalBodyReusable(c, request)
+	// Inspect background without enabling it on routes which previously
+	// omitted it. Stateless bridges must reject a requested background job.
+	var wire struct {
+		dto.OpenAIResponsesRequest
+		Background *bool `json:"background"`
+	}
+	err := common.UnmarshalBodyReusable(c, &wire)
 	if err != nil {
 		return nil, err
+	}
+	request := &wire.OpenAIResponsesRequest
+	if wire.Background != nil && *wire.Background {
+		common.SetContextKey(c, constant.ContextKeyResponsesBackground, true)
 	}
 	if request.Model == "" {
 		return nil, errors.New("model is required")

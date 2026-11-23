@@ -238,8 +238,33 @@ func (g *GeminiInlineData) UnmarshalJSON(data []byte) error {
 }
 
 type FunctionCall struct {
+	ID           string `json:"id,omitempty"`
 	FunctionName string `json:"name"`
 	Arguments    any    `json:"args"`
+}
+
+// Google tool metadata is opaque. Carry only the provider's actual signature
+// through a stateless function-call round trip.
+type GoogleToolExtra struct {
+	Google struct {
+		ThoughtSignature json.RawMessage `json:"thought_signature,omitempty"`
+	} `json:"google"`
+}
+
+func (f *FunctionCall) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		ID   string          `json:"id"`
+		Name string          `json:"name"`
+		Args json.RawMessage `json:"args"`
+	}
+	if err := common.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if len(wire.Args) == 0 {
+		wire.Args = json.RawMessage("{}")
+	}
+	f.ID, f.FunctionName, f.Arguments = wire.ID, wire.Name, wire.Args
+	return nil
 }
 
 type GeminiFunctionResponse struct {

@@ -1,11 +1,13 @@
 package gemini
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/types"
-	"net/http"
 )
 
 type geminiOutcome struct {
@@ -39,6 +41,12 @@ func (s *geminiOutcome) observe(frame *dto.GeminiChatResponse, native bool) (del
 			s.visible[c.Index] = false
 		}
 		for _, p := range c.Content.Parts {
+			if p.FunctionCall != nil {
+				raw, fromWire := p.FunctionCall.Arguments.(json.RawMessage)
+				if p.FunctionCall.FunctionName == "" || (fromWire && common.GetJsonType(raw) != "object") {
+					return false, geminiBadResult("Gemini returned an invalid function call")
+				}
+			}
 			usable := (!p.Thought && p.Text != "") || (p.FunctionCall != nil && p.FunctionCall.FunctionName != "") || (p.InlineData != nil && p.InlineData.Data != "") || p.ExecutableCode != nil || p.CodeExecutionResult != nil
 			if usable {
 				s.visible[c.Index] = true
@@ -67,6 +75,8 @@ func (s *geminiOutcome) observe(frame *dto.GeminiChatResponse, native bool) (del
 				return false, geminiBadResult("Gemini stopped without visible output")
 			}
 		case reason == "MAX_TOKENS", reason == "CONTINUATION", geminiPolicyFinish(reason):
+		case reason == "MALFORMED_RESPONSE" || reason == "MALFORMED_FUNCTION_CALL" || reason == "UNEXPECTED_TOOL_CALL" || reason == "TOO_MANY_TOOL_CALLS":
+			return false, geminiBadResult("Gemini returned " + reason)
 		default:
 			return false, geminiBadResult("Gemini returned an abnormal finish reason")
 		}

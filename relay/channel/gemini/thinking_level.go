@@ -2,14 +2,15 @@ package gemini
 
 import (
 	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 func geminiInvalid(reason string) *types.NewAPIError {

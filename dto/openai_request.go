@@ -289,11 +289,12 @@ func (r *GeneralOpenAIRequest) GetSystemRoleName() string {
 const CustomType = "custom"
 
 type ToolCallRequest struct {
-	CacheControl json.RawMessage `json:"cache_control,omitempty"`
-	ID           string          `json:"id,omitempty"`
-	Type         string          `json:"type"`
-	Function     FunctionRequest `json:"function,omitempty"`
-	Custom       json.RawMessage `json:"custom,omitempty"`
+	ExtraContent *GoogleToolExtra `json:"extra_content,omitempty"`
+	CacheControl json.RawMessage  `json:"cache_control,omitempty"`
+	ID           string           `json:"id,omitempty"`
+	Type         string           `json:"type"`
+	Function     FunctionRequest  `json:"function,omitempty"`
+	Custom       json.RawMessage  `json:"custom,omitempty"`
 }
 
 type FunctionRequest struct {

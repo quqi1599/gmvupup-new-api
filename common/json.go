@@ -15,6 +15,24 @@ func UnmarshalJsonStr(data string, v any) error {
 	return json.Unmarshal(StringToByteSlice(data), v)
 }
 
+// UnmarshalWithNumbers preserves integer and decimal literals in untyped
+// relay objects which will be serialized for a different protocol.
+func UnmarshalWithNumbers(data []byte, v any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(v); err != nil {
+		return err
+	}
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("unexpected trailing JSON value")
+		}
+		return err
+	}
+	return nil
+}
+
 func DecodeJson(reader io.Reader, v any) error {
 	return json.NewDecoder(reader).Decode(v)
 }

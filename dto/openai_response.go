@@ -122,6 +122,7 @@ func (c *ChatCompletionsStreamResponseChoiceDelta) SetReasoningContent(s string)
 }
 
 type ToolCallResponse struct {
+	ExtraContent *GoogleToolExtra `json:"extra_content,omitempty"`
 	// Index is not nil only in chat completion chunk object
 	Index    *int             `json:"index,omitempty"`
 	ID       string           `json:"id,omitempty"`
@@ -349,19 +350,20 @@ type IncompleteDetails struct {
 }
 
 type ResponsesOutput struct {
-	Type      string                          `json:"type"`
-	ID        string                          `json:"id"`
-	Status    string                          `json:"status"`
-	Role      string                          `json:"role"`
-	Content   []ResponsesOutputContent        `json:"content"`
-	Quality   string                          `json:"quality"`
-	Size      string                          `json:"size"`
-	Result    string                          `json:"result,omitempty"`
-	CallId    string                          `json:"call_id,omitempty"`
-	Name      string                          `json:"name,omitempty"`
-	Arguments json.RawMessage                 `json:"arguments,omitempty"`
-	Input     json.RawMessage                 `json:"input,omitempty"`
-	Summary   []ResponsesReasoningSummaryPart `json:"summary,omitempty"`
+	ExtraContent *GoogleToolExtra                `json:"extra_content,omitempty"`
+	Type         string                          `json:"type"`
+	ID           string                          `json:"id"`
+	Status       string                          `json:"status"`
+	Role         string                          `json:"role"`
+	Content      []ResponsesOutputContent        `json:"content"`
+	Quality      string                          `json:"quality"`
+	Size         string                          `json:"size"`
+	Result       string                          `json:"result,omitempty"`
+	CallId       string                          `json:"call_id,omitempty"`
+	Name         string                          `json:"name,omitempty"`
+	Arguments    json.RawMessage                 `json:"arguments,omitempty"`
+	Input        json.RawMessage                 `json:"input,omitempty"`
+	Summary      []ResponsesReasoningSummaryPart `json:"summary,omitempty"`
 }
 
 // ArgumentsString returns function call arguments in the string form expected by Chat Completions.
@@ -388,8 +390,9 @@ type ResponsesOutputContent struct {
 }
 
 type ResponsesReasoningSummaryPart struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type        string `json:"type"`
+	Text        string `json:"text"`
+	Annotations *[]any `json:"annotations,omitempty"`
 }
 
 const (

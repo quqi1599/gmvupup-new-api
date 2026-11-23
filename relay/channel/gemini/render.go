@@ -1,10 +1,11 @@
 package gemini
 
 import (
+	"strings"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
-	"strings"
 )
 
 func renderGeminiParts(parts []dto.GeminiPart) (string, string, []dto.ToolCallResponse) {
