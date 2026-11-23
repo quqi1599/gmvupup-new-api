@@ -244,6 +244,20 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 				Message: e.Error(),
 				Type:    openAIError.Type,
 			}
+			// Our CPA clients also branch on the finer machine code (e.g.
+			// request_too_large). It is not the Anthropic error category.
+			switch code := openAIError.Code.(type) {
+			case string:
+				if validClaudeMachineCode(code) {
+					result.Code = code
+				}
+			case ErrorCode:
+				if validClaudeMachineCode(string(code)) {
+					result.Code = string(code)
+				}
+			case int, int64, float64, json.Number:
+				result.Code = code
+			}
 			if result.Type == string(ErrorTypeUpstreamError) {
 				if code, ok := openAIError.Code.(string); ok {
 					switch code {
@@ -270,6 +284,18 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 		result.Message = string(e.errorType)
 	}
 	return result
+}
+
+func validClaudeMachineCode(code string) bool {
+	if len(code) == 0 || len(code) > 128 {
+		return false
+	}
+	for _, r := range code {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-' || r == '.') {
+			return false
+		}
+	}
+	return true
 }
 
 type NewAPIErrorOptions func(*NewAPIError)
