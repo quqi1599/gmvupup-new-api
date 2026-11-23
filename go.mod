@@ -8,7 +8,7 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.32.0
 	github.com/abema/go-mp4 v1.4.1
 	github.com/alicebob/miniredis/v2 v2.38.0
-	github.com/andybalholm/brotli v1.1.1
+	github.com/andybalholm/brotli v1.2.7
 	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.10
