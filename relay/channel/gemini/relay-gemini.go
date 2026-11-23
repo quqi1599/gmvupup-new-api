@@ -15,9 +15,9 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
-	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
@@ -1069,192 +1069,26 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 	return usage
 }
 
+// Convert candidates independently: an earlier candidate's tools must never
+// change the finish reason of another candidate.
 func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse) *dto.OpenAITextResponse {
-	fullTextResponse := dto.OpenAITextResponse{
-		Id:      helper.GetResponseID(c),
-		Object:  "chat.completion",
-		Created: common.GetTimestamp(),
-		Choices: make([]dto.OpenAITextResponseChoice, 0, len(response.Candidates)),
-	}
-	isToolCall := false
+	out := &dto.OpenAITextResponse{Id: helper.GetResponseID(c), Object: "chat.completion", Created: common.GetTimestamp(), Choices: make([]dto.OpenAITextResponseChoice, 0, len(response.Candidates))}
 	for _, candidate := range response.Candidates {
-		choice := dto.OpenAITextResponseChoice{
-			Index: int(candidate.Index),
-			Message: dto.Message{
-				Role:    "assistant",
-				Content: "",
-			},
-			FinishReason: constant.FinishReasonStop,
+		text, thought, calls := renderGeminiParts(candidate.Content.Parts)
+		choice := dto.OpenAITextResponseChoice{Index: int(candidate.Index), Message: dto.Message{Role: "assistant"}, FinishReason: geminiFinish(candidate.FinishReason, len(calls) > 0)}
+		if choice.FinishReason == "" {
+			choice.FinishReason = constant.FinishReasonStop
 		}
-		if len(candidate.Content.Parts) > 0 {
-			var texts []string
-			var toolCalls []dto.ToolCallResponse
-			for _, part := range candidate.Content.Parts {
-				if part.InlineData != nil {
-					// 媒体内容
-					if strings.HasPrefix(part.InlineData.MimeType, "image") {
-						imgText := "![image](data:" + part.InlineData.MimeType + ";base64," + part.InlineData.Data + ")"
-						texts = append(texts, imgText)
-					} else {
-						// 其他媒体类型，直接显示链接
-						texts = append(texts, fmt.Sprintf("[media](data:%s;base64,%s)", part.InlineData.MimeType, part.InlineData.Data))
-					}
-				} else if part.FunctionCall != nil {
-					choice.FinishReason = constant.FinishReasonToolCalls
-					if call := getResponseToolCall(&part); call != nil {
-						toolCalls = append(toolCalls, *call)
-					}
-				} else if part.Thought {
-					choice.Message.ReasoningContent = &part.Text
-				} else {
-					if part.ExecutableCode != nil {
-						texts = append(texts, "```"+part.ExecutableCode.Language+"\n"+part.ExecutableCode.Code+"\n```")
-					} else if part.CodeExecutionResult != nil {
-						texts = append(texts, "```output\n"+part.CodeExecutionResult.Output+"\n```")
-					} else {
-						// 过滤掉空行
-						if part.Text != "\n" {
-							texts = append(texts, part.Text)
-						}
-					}
-				}
-			}
-			if len(toolCalls) > 0 {
-				choice.Message.SetToolCalls(toolCalls)
-				isToolCall = true
-			}
-			choice.Message.SetStringContent(strings.Join(texts, "\n"))
-
+		choice.Message.SetStringContent(text)
+		if thought != "" {
+			choice.Message.ReasoningContent = &thought
 		}
-		if candidate.FinishReason != nil {
-			switch *candidate.FinishReason {
-			case "STOP":
-				choice.FinishReason = constant.FinishReasonStop
-			case "MAX_TOKENS":
-				choice.FinishReason = constant.FinishReasonLength
-			case "SAFETY":
-				// Safety filter triggered
-				choice.FinishReason = constant.FinishReasonContentFilter
-			case "RECITATION":
-				// Recitation (citation) detected
-				choice.FinishReason = constant.FinishReasonContentFilter
-			case "BLOCKLIST":
-				// Blocklist triggered
-				choice.FinishReason = constant.FinishReasonContentFilter
-			case "PROHIBITED_CONTENT":
-				// Prohibited content detected
-				choice.FinishReason = constant.FinishReasonContentFilter
-			case "SPII":
-				// Sensitive personally identifiable information
-				choice.FinishReason = constant.FinishReasonContentFilter
-			case "OTHER":
-				// Other reasons
-				choice.FinishReason = constant.FinishReasonContentFilter
-			default:
-				choice.FinishReason = constant.FinishReasonContentFilter
-			}
+		if len(calls) > 0 {
+			choice.Message.SetToolCalls(calls)
 		}
-		if isToolCall {
-			choice.FinishReason = constant.FinishReasonToolCalls
-		}
-
-		fullTextResponse.Choices = append(fullTextResponse.Choices, choice)
+		out.Choices = append(out.Choices, choice)
 	}
-	return &fullTextResponse
-}
-
-func streamResponseGeminiChat2OpenAI(geminiResponse *dto.GeminiChatResponse) (*dto.ChatCompletionsStreamResponse, bool) {
-	choices := make([]dto.ChatCompletionsStreamResponseChoice, 0, len(geminiResponse.Candidates))
-	isStop := false
-	for _, candidate := range geminiResponse.Candidates {
-		if candidate.FinishReason != nil && *candidate.FinishReason == "STOP" {
-			isStop = true
-			candidate.FinishReason = nil
-		}
-		choice := dto.ChatCompletionsStreamResponseChoice{
-			Index: int(candidate.Index),
-			Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
-				//Role: "assistant",
-			},
-		}
-		var texts []string
-		isTools := false
-		isThought := false
-		if candidate.FinishReason != nil {
-			// Map Gemini FinishReason to OpenAI finish_reason
-			switch *candidate.FinishReason {
-			case "STOP":
-				// Normal completion
-				choice.FinishReason = &constant.FinishReasonStop
-			case "MAX_TOKENS":
-				// Reached maximum token limit
-				choice.FinishReason = &constant.FinishReasonLength
-			case "SAFETY":
-				// Safety filter triggered
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			case "RECITATION":
-				// Recitation (citation) detected
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			case "BLOCKLIST":
-				// Blocklist triggered
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			case "PROHIBITED_CONTENT":
-				// Prohibited content detected
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			case "SPII":
-				// Sensitive personally identifiable information
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			case "OTHER":
-				// Other reasons
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			default:
-				// Unknown reason, treat as content filter
-				choice.FinishReason = &constant.FinishReasonContentFilter
-			}
-		}
-		for _, part := range candidate.Content.Parts {
-			if part.InlineData != nil {
-				if strings.HasPrefix(part.InlineData.MimeType, "image") {
-					imgText := "![image](data:" + part.InlineData.MimeType + ";base64," + part.InlineData.Data + ")"
-					texts = append(texts, imgText)
-				}
-			} else if part.FunctionCall != nil {
-				isTools = true
-				if call := getResponseToolCall(&part); call != nil {
-					call.SetIndex(len(choice.Delta.ToolCalls))
-					choice.Delta.ToolCalls = append(choice.Delta.ToolCalls, *call)
-				}
-
-			} else if part.Thought {
-				isThought = true
-				texts = append(texts, part.Text)
-			} else {
-				if part.ExecutableCode != nil {
-					texts = append(texts, "```"+part.ExecutableCode.Language+"\n"+part.ExecutableCode.Code+"\n```\n")
-				} else if part.CodeExecutionResult != nil {
-					texts = append(texts, "```output\n"+part.CodeExecutionResult.Output+"\n```\n")
-				} else {
-					if part.Text != "\n" {
-						texts = append(texts, part.Text)
-					}
-				}
-			}
-		}
-		if isThought {
-			choice.Delta.SetReasoningContent(strings.Join(texts, "\n"))
-		} else {
-			choice.Delta.SetContentString(strings.Join(texts, "\n"))
-		}
-		if isTools {
-			choice.FinishReason = &constant.FinishReasonToolCalls
-		}
-		choices = append(choices, choice)
-	}
-
-	var response dto.ChatCompletionsStreamResponse
-	response.Object = "chat.completion.chunk"
-	response.Choices = choices
-	return &response, isStop
+	return out
 }
 
 func handleStream(c *gin.Context, info *relaycommon.RelayInfo, resp *dto.ChatCompletionsStreamResponse) error {
@@ -1274,20 +1108,31 @@ func handleFinalStream(c *gin.Context, info *relaycommon.RelayInfo, resp *dto.Ch
 	if err != nil {
 		return fmt.Errorf("failed to marshal stream response: %w", err)
 	}
-	openai.HandleFinalResponse(c, info, string(streamData), resp.Id, resp.Created, resp.Model, resp.GetSystemFingerprint(), resp.Usage, false)
-	return nil
+	return openai.HandleFinalResponse(c, info, string(streamData), resp.Id, resp.Created, resp.Model, resp.GetSystemFingerprint(), resp.Usage, false)
 }
 
 func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response, callback func(data string, geminiResponse *dto.GeminiChatResponse) bool) (*dto.Usage, *types.NewAPIError) {
 	var usage = &dto.Usage{}
 	var imageCount int
 	responseText := strings.Builder{}
+	var outcome geminiOutcome
+	var semanticErr *types.NewAPIError
+	terminal := false
+	reportedUsage := false
+	expected := 1
+	if req, ok := info.Request.(*dto.GeminiChatRequest); ok && req.GenerationConfig.CandidateCount != nil && *req.GenerationConfig.CandidateCount > 1 {
+		expected = *req.GenerationConfig.CandidateCount
+	}
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		var geminiResponse dto.GeminiChatResponse
 		if err := common.UnmarshalJsonStr(data, &geminiResponse); err != nil {
 			sr.Stop(fmt.Errorf("unmarshal: %w", err))
 			return
+		}
+		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
+			*usage = buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
+			reportedUsage = true
 		}
 		if len(geminiResponse.Candidates) == 0 && geminiResponse.PromptFeedback == nil && geminiResponse.UsageMetadata.TotalTokenCount == 0 {
 			sr.Error(fmt.Errorf("empty gemini stream event"))
@@ -1296,7 +1141,17 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 
 		if len(geminiResponse.Candidates) == 0 && geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != nil {
 			common.SetContextKey(c, constant.ContextKeyAdminRejectReason, fmt.Sprintf("gemini_block_reason=%s", *geminiResponse.PromptFeedback.BlockReason))
-			sr.Stop(fmt.Errorf("gemini prompt blocked: %s", *geminiResponse.PromptFeedback.BlockReason))
+			semanticErr = types.NewOpenAIError(errors.New("request blocked by Gemini"), types.ErrorCodePromptBlocked, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+			sr.Stop(semanticErr)
+			return
+		}
+		deliver, invalid := outcome.observe(&geminiResponse, info.RelayMode == relayconstant.RelayModeGemini)
+		if invalid != nil {
+			semanticErr = invalid
+			sr.Stop(invalid)
+			return
+		}
+		if !deliver && (info.ReceivedResponseCount == 0 || info.RelayMode != relayconstant.RelayModeGemini) {
 			return
 		}
 		if !sr.Accept() {
@@ -1315,34 +1170,33 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			}
 		}
 
-		// 更新使用量统计
-		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
-			mappedUsage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
-			*usage = mappedUsage
-		}
-
 		if !callback(data, &geminiResponse) {
 			sr.Stop(fmt.Errorf("gemini callback stopped"))
 			return
 		}
-		for _, candidate := range geminiResponse.Candidates {
-			if candidate.FinishReason != nil && *candidate.FinishReason != "" {
-				sr.Done()
-				return
-			}
+		if len(outcome.ended) >= expected && len(outcome.ended) == len(outcome.visible) {
+			terminal = true
+			sr.Done()
 		}
 	})
-	if streamErr := helper.PreOutputStreamError(c, info); streamErr != nil {
-		return nil, streamErr
+	if semanticErr == nil {
+		if streamErr := helper.PreOutputStreamError(c, info); streamErr != nil {
+			return nil, streamErr
+		}
+	} else if !helper.StreamStarted(c) {
+		if reportedUsage {
+			return usage, semanticErr
+		}
+		return nil, semanticErr
 	}
 
-	if imageCount != 0 {
+	if imageCount != 0 && !reportedUsage {
 		if usage.CompletionTokens == 0 {
 			usage.CompletionTokens = imageCount * 1400
 		}
 	}
 
-	if usage.CompletionTokens <= 0 {
+	if !reportedUsage && usage.CompletionTokens <= 0 {
 		if info.ReceivedResponseCount > 0 {
 			usage = service.ResponseText2Usage(c, responseText.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		} else {
@@ -1350,114 +1204,83 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		}
 	}
 
+	if semanticErr != nil {
+		info.PartialStreamError = semanticErr
+		return usage, semanticErr
+	}
+	if post := helper.PostOutputStreamError(c, info); post != nil {
+		return usage, post
+	}
+	if !terminal {
+		err := geminiBadResult("Gemini stream ended before a candidate terminal")
+		if helper.StreamStarted(c) {
+			info.PartialStreamError = err
+		}
+		return usage, err
+	}
 	return usage, nil
 }
 
 func GeminiChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
-	id := helper.GetResponseID(c)
-	createAt := common.GetTimestamp()
-	finishReason := constant.FinishReasonStop
-	toolCallIndexByChoice := make(map[int]map[string]int)
-	nextToolCallIndexByChoice := make(map[int]int)
-
-	usage, err := geminiStreamHandler(c, info, resp, func(data string, geminiResponse *dto.GeminiChatResponse) bool {
-		response, isStop := streamResponseGeminiChat2OpenAI(geminiResponse)
-
-		response.Id = id
-		response.Created = createAt
-		response.Model = info.UpstreamModelName
-		if response.IsToolCall() {
-			finishReason = constant.FinishReasonToolCalls
-			if info.RelayFormat == types.RelayFormatClaude {
-				for choiceIdx := range response.Choices {
-					response.Choices[choiceIdx].FinishReason = nil
+	id, created := helper.GetResponseID(c), common.GetTimestamp()
+	finish := constant.FinishReasonStop
+	var chunks geminiChunker
+	var writeErr error
+	emit := func(chunk *dto.ChatCompletionsStreamResponse) bool {
+		chunk.Id, chunk.Created, chunk.Model = id, created, info.UpstreamModelName
+		writeErr = handleStream(c, info, chunk)
+		return writeErr == nil
+	}
+	usage, streamErr := geminiStreamHandler(c, info, resp, func(_ string, frame *dto.GeminiChatResponse) bool {
+		if info.SendResponseCount == 0 && !emit(helper.GenerateStartEmptyResponse(id, created, info.UpstreamModelName, nil)) {
+			return false
+		}
+		if info.RelayFormat != types.RelayFormatClaude {
+			return emit(chunks.chunk(frame))
+		}
+		// Anthropic deltas have a single block type. Preserve provider order
+		// and defer message_stop until we have the final provider usage.
+		for _, candidate := range frame.Candidates {
+			for i := range candidate.Content.Parts {
+				part := candidate
+				part.FinishReason = nil
+				part.Content.Parts = candidate.Content.Parts[i : i+1]
+				if !emit(chunks.chunk(&dto.GeminiChatResponse{Candidates: []dto.GeminiChatCandidate{part}})) {
+					return false
 				}
 			}
-		}
-		for choiceIdx := range response.Choices {
-			choiceKey := response.Choices[choiceIdx].Index
-			for toolIdx := range response.Choices[choiceIdx].Delta.ToolCalls {
-				tool := &response.Choices[choiceIdx].Delta.ToolCalls[toolIdx]
-				if tool.ID == "" {
-					continue
-				}
-				m := toolCallIndexByChoice[choiceKey]
-				if m == nil {
-					m = make(map[string]int)
-					toolCallIndexByChoice[choiceKey] = m
-				}
-				if idx, ok := m[tool.ID]; ok {
-					tool.SetIndex(idx)
-					continue
-				}
-				idx := nextToolCallIndexByChoice[choiceKey]
-				nextToolCallIndexByChoice[choiceKey] = idx + 1
-				m[tool.ID] = idx
-				tool.SetIndex(idx)
-			}
-		}
-
-		logger.LogDebug(c, fmt.Sprintf("info.SendResponseCount = %d", info.SendResponseCount))
-		if info.SendResponseCount == 0 {
-			// send first response
-			emptyResponse := helper.GenerateStartEmptyResponse(id, createAt, info.UpstreamModelName, nil)
-			if response.IsToolCall() {
-				if len(emptyResponse.Choices) > 0 && len(response.Choices) > 0 {
-					toolCalls := response.Choices[0].Delta.ToolCalls
-					copiedToolCalls := make([]dto.ToolCallResponse, len(toolCalls))
-					for idx := range toolCalls {
-						copiedToolCalls[idx] = toolCalls[idx]
-						copiedToolCalls[idx].Function.Arguments = ""
-					}
-					emptyResponse.Choices[0].Delta.ToolCalls = copiedToolCalls
-				}
-				finishReason = constant.FinishReasonToolCalls
-				err := handleStream(c, info, emptyResponse)
-				if err != nil {
-					logger.LogError(c, err.Error())
-				}
-
-				response.ClearToolCalls()
-				if response.IsFinished() {
-					response.Choices[0].FinishReason = nil
-				}
-			} else {
-				err := handleStream(c, info, emptyResponse)
-				if err != nil {
-					logger.LogError(c, err.Error())
-				}
-			}
-		}
-
-		err := handleStream(c, info, response)
-		if err != nil {
-			logger.LogError(c, err.Error())
-		}
-		if isStop {
-			if info.RelayFormat != types.RelayFormatClaude {
-				_ = handleStream(c, info, helper.GenerateStopResponse(id, createAt, info.UpstreamModelName, finishReason))
+			if r := geminiFinish(candidate.FinishReason, chunks.nextTool[int(candidate.Index)] > 0); r != "" {
+				finish = r
 			}
 		}
 		return true
 	})
-
-	if err != nil {
-		return usage, err
+	if writeErr != nil {
+		return usage, geminiWriteError(c, info, writeErr)
 	}
-	if !helper.ShouldFinalizeStream(info) {
-		return usage, nil
+	if streamErr != nil {
+		return usage, streamErr
 	}
-
-	response := helper.GenerateFinalUsageResponse(id, createAt, info.UpstreamModelName, *usage)
-	if info.RelayFormat == types.RelayFormatClaude && info.ClaudeConvertInfo != nil && !info.ClaudeConvertInfo.Done {
-		response = helper.GenerateStopResponse(id, createAt, info.UpstreamModelName, finishReason)
-		response.Usage = usage
+	final := helper.GenerateFinalUsageResponse(id, created, info.UpstreamModelName, *usage)
+	if info.RelayFormat == types.RelayFormatClaude {
+		final = helper.GenerateStopResponse(id, created, info.UpstreamModelName, finish)
+		final.Usage = usage
 	}
-	handleErr := handleFinalStream(c, info, response)
-	if handleErr != nil {
-		common.SysLog("send final response failed: " + handleErr.Error())
+	if err := handleFinalStream(c, info, final); err != nil {
+		return usage, geminiWriteError(c, info, err)
 	}
 	return usage, nil
+}
+
+func geminiWriteError(c *gin.Context, info *relaycommon.RelayInfo, err error) *types.NewAPIError {
+	if delivery := helper.DownstreamStreamError(c, info, err); delivery != nil {
+		return delivery
+	}
+	result := types.NewErrorWithStatusCode(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+	if helper.StreamStarted(c) {
+		info.PartialStreamError = result
+	}
+	return result
 }
 
 func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {

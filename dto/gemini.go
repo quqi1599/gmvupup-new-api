@@ -44,9 +44,9 @@ func (r *GeminiChatRequest) UnmarshalJSON(data []byte) error {
 }
 
 type ToolConfig struct {
-	FunctionCallingConfig *FunctionCallingConfig `json:"functionCallingConfig,omitempty"`
-	RetrievalConfig       *RetrievalConfig       `json:"retrievalConfig,omitempty"`
-	IncludeServerSideToolInvocations *bool       `json:"includeServerSideToolInvocations,omitempty"`
+	FunctionCallingConfig            *FunctionCallingConfig `json:"functionCallingConfig,omitempty"`
+	RetrievalConfig                  *RetrievalConfig       `json:"retrievalConfig,omitempty"`
+	IncludeServerSideToolInvocations *bool                  `json:"includeServerSideToolInvocations,omitempty"`
 }
 
 type FunctionCallingConfig struct {
@@ -438,10 +438,11 @@ func (c *GeminiChatGenerationConfig) UnmarshalJSON(data []byte) error {
 type MediaResolution string
 
 type GeminiChatCandidate struct {
-	Content       GeminiChatContent        `json:"content"`
-	FinishReason  *string                  `json:"finishReason"`
-	Index         int64                    `json:"index"`
-	SafetyRatings []GeminiChatSafetyRating `json:"safetyRatings"`
+	GroundingMetadata json.RawMessage          `json:"groundingMetadata,omitempty"`
+	Content           GeminiChatContent        `json:"content"`
+	FinishReason      *string                  `json:"finishReason"`
+	Index             int64                    `json:"index"`
+	SafetyRatings     []GeminiChatSafetyRating `json:"safetyRatings"`
 }
 
 type GeminiChatSafetyRating struct {
