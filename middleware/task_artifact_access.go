@@ -12,7 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const TaskArtifactAccessContextKey = "task_artifact_access"
+const (
+	TaskArtifactAccessContextKey          = "task_artifact_access"
+	taskArtifactDashboardAccessContextKey = "task_artifact_dashboard_access"
+)
 
 const (
 	taskArtifactAccessRawContextKey       = "task_artifact_access_raw"
@@ -196,7 +199,9 @@ func TokenOrTaskArtifactAccessAuth(taskParam, artifactParam string) gin.HandlerF
 		if ip == "" {
 			ip = "unknown"
 		}
-		if invalid || !service.VerifyTaskArtifactAccess(rawAccess, taskID, artifactKey) {
+		dashboardAccess := !invalid && artifactKey == "video" &&
+			service.VerifyDashboardTaskArtifactAccess(rawAccess, taskID, artifactKey)
+		if invalid || !dashboardAccess && !service.VerifyTaskArtifactAccess(rawAccess, taskID, artifactKey) {
 			if !taskArtifactAnonymousLimiter.invalidAttempt(time.Now(), ip) {
 				writeTaskArtifactAccessLimited(c)
 				return
@@ -213,12 +218,17 @@ func TokenOrTaskArtifactAccessAuth(taskParam, artifactParam string) gin.HandlerF
 		defer release()
 
 		c.Set(TaskArtifactAccessContextKey, true)
+		c.Set(taskArtifactDashboardAccessContextKey, dashboardAccess)
 		c.Next()
 	}
 }
 
 func IsTaskArtifactAccess(c *gin.Context) bool {
 	return c != nil && c.GetBool(TaskArtifactAccessContextKey)
+}
+
+func IsDashboardTaskArtifactAccess(c *gin.Context) bool {
+	return IsTaskArtifactAccess(c) && c.GetBool(taskArtifactDashboardAccessContextKey)
 }
 
 func writeTaskArtifactAccessNotFound(c *gin.Context) {

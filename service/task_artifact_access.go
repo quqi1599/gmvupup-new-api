@@ -14,22 +14,27 @@ import (
 )
 
 const (
-	TaskArtifactAccessQueryParameter = "access"
-	taskArtifactAccessVersion        = "v1"
-	taskArtifactAccessLength         = 43
-	maxTaskArtifactTaskIDLength      = 191
-	maxTaskArtifactKeyLength         = 128
+	TaskArtifactAccessQueryParameter   = "access"
+	taskArtifactAccessVersion          = "v1"
+	dashboardTaskArtifactAccessVersion = "dashboard-video-v1"
+	taskArtifactAccessLength           = 43
+	maxTaskArtifactTaskIDLength        = 191
+	maxTaskArtifactKeyLength           = 128
 )
 
 var ErrTaskArtifactAccessInvalid = errors.New("task artifact access is invalid")
 
-func taskArtifactAccessMessage(taskID, artifactKey string) []byte {
-	return []byte(taskArtifactAccessVersion + "\x00" + taskID + "\x00" + artifactKey)
+func taskArtifactAccessMessage(version, taskID, artifactKey string) []byte {
+	return []byte(version + "\x00" + taskID + "\x00" + artifactKey)
 }
 
 // IssueTaskArtifactAccess creates a stable capability bound to exactly one
 // public task ID and artifact key. It contains no user or upstream data.
 func IssueTaskArtifactAccess(taskID, artifactKey string) (string, error) {
+	return issueTaskArtifactAccess(taskArtifactAccessVersion, taskID, artifactKey)
+}
+
+func issueTaskArtifactAccess(version, taskID, artifactKey string) (string, error) {
 	taskID = strings.TrimSpace(taskID)
 	artifactKey = strings.TrimSpace(artifactKey)
 	if taskID == "" || len(taskID) > maxTaskArtifactTaskIDLength ||
@@ -39,13 +44,23 @@ func IssueTaskArtifactAccess(taskID, artifactKey string) (string, error) {
 	}
 
 	mac := hmac.New(sha256.New, []byte(common.CryptoSecret))
-	_, _ = mac.Write(taskArtifactAccessMessage(taskID, artifactKey))
+	_, _ = mac.Write(taskArtifactAccessMessage(version, taskID, artifactKey))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 // VerifyTaskArtifactAccess verifies the route binding without reading task,
 // user, or token state. Signature comparison is constant-time.
 func VerifyTaskArtifactAccess(access, taskID, artifactKey string) bool {
+	return verifyTaskArtifactAccess(taskArtifactAccessVersion, access, taskID, artifactKey)
+}
+
+// VerifyDashboardTaskArtifactAccess checks the capability issued for dashboard
+// video delivery. Standard relay artifact capabilities have a distinct signature.
+func VerifyDashboardTaskArtifactAccess(access, taskID, artifactKey string) bool {
+	return verifyTaskArtifactAccess(dashboardTaskArtifactAccessVersion, access, taskID, artifactKey)
+}
+
+func verifyTaskArtifactAccess(version, access, taskID, artifactKey string) bool {
 	taskID = strings.TrimSpace(taskID)
 	artifactKey = strings.TrimSpace(artifactKey)
 	if len(access) != taskArtifactAccessLength ||
@@ -61,7 +76,7 @@ func VerifyTaskArtifactAccess(access, taskID, artifactKey string) bool {
 	}
 
 	mac := hmac.New(sha256.New, []byte(common.CryptoSecret))
-	_, _ = mac.Write(taskArtifactAccessMessage(taskID, artifactKey))
+	_, _ = mac.Write(taskArtifactAccessMessage(version, taskID, artifactKey))
 	return hmac.Equal(actualSignature, mac.Sum(nil))
 }
 
@@ -96,6 +111,16 @@ func ValidateTaskArtifactBaseURL(raw string) error {
 // TaskPublicAddress wins when configured; ServerAddress is the only fallback.
 // Request Host headers are intentionally not involved.
 func BuildTaskArtifactContentURL(taskID, artifactKey string) (string, error) {
+	return buildTaskArtifactContentURL(taskArtifactAccessVersion, taskID, artifactKey)
+}
+
+// BuildDashboardTaskArtifactContentURL allows the dashboard to use an eligible
+// provider's signed video URL after the content endpoint authorizes the task.
+func BuildDashboardTaskArtifactContentURL(taskID, artifactKey string) (string, error) {
+	return buildTaskArtifactContentURL(dashboardTaskArtifactAccessVersion, taskID, artifactKey)
+}
+
+func buildTaskArtifactContentURL(version, taskID, artifactKey string) (string, error) {
 	taskID = strings.TrimSpace(taskID)
 	artifactKey = strings.TrimSpace(artifactKey)
 	if taskID == "" || len(taskID) > maxTaskArtifactTaskIDLength ||
@@ -115,7 +140,7 @@ func BuildTaskArtifactContentURL(taskID, artifactKey string) (string, error) {
 		return "", err
 	}
 
-	access, err := IssueTaskArtifactAccess(taskID, artifactKey)
+	access, err := issueTaskArtifactAccess(version, taskID, artifactKey)
 	if err != nil {
 		return "", err
 	}

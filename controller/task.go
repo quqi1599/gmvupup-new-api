@@ -100,7 +100,11 @@ func writeTaskArtifacts(c *gin.Context, task *model.Task, dashboard bool) {
 	}
 	items := make([]taskArtifactResponse, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		contentURL, buildErr := service.BuildTaskArtifactContentURL(task.TaskID, artifact.Key)
+		buildContentURL := service.BuildTaskArtifactContentURL
+		if dashboard && artifact.Key == "video" && artifact.Type == "video" && isDashboardDirectVideoTask(task) {
+			buildContentURL = service.BuildDashboardTaskArtifactContentURL
+		}
+		contentURL, buildErr := buildContentURL(task.TaskID, artifact.Key)
 		if buildErr != nil {
 			writeTaskArtifactError(c, http.StatusInternalServerError, "artifact_url_error", "Failed to build artifact content URL")
 			return
@@ -393,8 +397,30 @@ func TaskArtifactContent(c *gin.Context) {
 		writeTaskArtifactError(c, http.StatusInternalServerError, "artifact_plugin_error", "Artifact content plugin failed")
 		return
 	}
+	if artifactKey == "video" && middleware.IsDashboardTaskArtifactAccess(c) &&
+		c.Request.Method == http.MethodGet && isDashboardDirectVideoTask(task) {
+		if location := dashboardDirectVideoURL(task.PrivateData.Execution.TaskPlugin.Key, descriptor); location != "" {
+			c.Header("Cache-Control", "private, no-store")
+			c.Header("Referrer-Policy", "no-referrer")
+			c.Header("Location", location)
+			c.Status(http.StatusTemporaryRedirect)
+			return
+		}
+	}
 	if err := proxyTaskMedia(c, task, descriptor); err != nil {
 		writeTaskMediaProxyError(c, err)
+	}
+}
+
+func isDashboardDirectVideoTask(task *model.Task) bool {
+	if !taskHasPluginExecution(task) {
+		return false
+	}
+	switch task.PrivateData.Execution.TaskPlugin.Key {
+	case "doubao", "hailuo":
+		return true
+	default:
+		return false
 	}
 }
 

@@ -132,6 +132,47 @@ func VideoProxy(c *gin.Context) {
 	}
 }
 
+// dashboardDirectVideoURL recognizes MP4 objects from the exact storage
+// bucket used by each video plugin. Hailuo returns a public object URL;
+// Doubao returns a URL signed for credentialless GET requests.
+func dashboardDirectVideoURL(plugin string, descriptor *relaychannel.TaskContentRequest) string {
+	if descriptor == nil || !descriptor.Credentialless || descriptor.Method != http.MethodGet ||
+		len(descriptor.Headers) != 0 || len(descriptor.Body) != 0 || len(descriptor.ContentPath) != 0 ||
+		len(descriptor.URL) > 64<<10 {
+		return ""
+	}
+	target, err := url.Parse(descriptor.URL)
+	if err != nil || target.Scheme != "https" || target.User != nil || target.Opaque != "" ||
+		target.Fragment != "" || strings.Contains(descriptor.URL, "#") ||
+		!strings.HasSuffix(strings.ToLower(target.Path), ".mp4") {
+		return ""
+	}
+	host := strings.ToLower(target.Host)
+	if plugin == "hailuo" && host == "bk-hs-p-bj-lizhen.tos-cn-beijing.volces.com" &&
+		target.RawQuery == "" && !target.ForceQuery {
+		return target.String()
+	}
+	if plugin != "doubao" || host != "ark-acg-cn-beijing.tos-cn-beijing.volces.com" {
+		return ""
+	}
+	query, err := url.ParseQuery(target.RawQuery)
+	if err != nil || query.Get("X-Tos-Algorithm") != "TOS4-HMAC-SHA256" ||
+		query.Get("X-Tos-SignedHeaders") != "host" || query.Get("X-Tos-Credential") == "" ||
+		query.Get("X-Tos-Date") == "" || query.Get("X-Tos-Expires") == "" {
+		return ""
+	}
+	signature := query.Get("X-Tos-Signature")
+	if len(signature) != 64 {
+		return ""
+	}
+	for _, char := range signature {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+			return ""
+		}
+	}
+	return target.String()
+}
+
 func proxyTaskMedia(c *gin.Context, task *model.Task, descriptor *relaychannel.TaskContentRequest) error {
 	if descriptor == nil {
 		return &taskMediaProxyError{

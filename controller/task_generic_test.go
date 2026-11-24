@@ -64,6 +64,108 @@ func allowPrivateTaskMediaTest(t *testing.T) {
 	service.InitHttpClient()
 }
 
+func TestDashboardRoutesProviderVideosWithoutProxy(t *testing.T) {
+	previousSecret := common.CryptoSecret
+	previousPublicAddress := system_setting.TaskPublicAddress
+	previousMemoryCache := common.MemoryCacheEnabled
+	common.CryptoSecret = "dashboard-video-test-secret"
+	system_setting.TaskPublicAddress = "https://gateway.example"
+	common.MemoryCacheEnabled = false
+	t.Cleanup(func() {
+		common.CryptoSecret = previousSecret
+		system_setting.TaskPublicAddress = previousPublicAddress
+		common.MemoryCacheEnabled = previousMemoryCache
+	})
+
+	for _, tc := range []struct {
+		plugin string
+		host   string
+	}{
+		{"doubao", "ark-acg-cn-beijing.tos-cn-beijing.volces.com"},
+		{"hailuo", "bk-hs-p-bj-lizhen.tos-cn-beijing.volces.com"},
+	} {
+		t.Run(tc.plugin, func(t *testing.T) {
+			task := setupGenericTaskTest(t)
+			task.Platform = constant.TaskPlatform(tc.plugin)
+			task.PrivateData.Execution = &model.TaskExecutionSnapshot{
+				TaskPlugin: &model.TaskPluginSnapshot{Key: tc.plugin, APIVersion: 1},
+			}
+			upstreamURL := "https://" + tc.host + "/test.mp4"
+			if tc.plugin == "doubao" {
+				upstreamURL += "?X-Tos-Algorithm=TOS4-HMAC-SHA256" +
+					"&X-Tos-SignedHeaders=host&X-Tos-Credential=test&X-Tos-Date=20261124T040000Z&X-Tos-Expires=86400" +
+					"&X-Tos-Signature=" + strings.Repeat("a", 64)
+				task.SetData(map[string]any{"content": map[string]any{"video_url": upstreamURL}})
+			} else {
+				task.SetData(map[string]any{"task": map[string]any{"content": map[string]any{"url": upstreamURL}}})
+			}
+			require.NoError(t, model.DB.Save(task).Error)
+
+			router := gin.New()
+			router.GET("/api/task/:task_id/artifacts", func(c *gin.Context) {
+				c.Set("id", task.UserId)
+			}, GetDashboardTaskArtifacts)
+			router.GET("/v1/tasks/:key/artifacts/:artifact_key/content",
+				middleware.TokenOrTaskArtifactAccessAuth("key", "artifact_key"), TaskArtifactContent)
+
+			list := httptest.NewRecorder()
+			router.ServeHTTP(list, httptest.NewRequest(http.MethodGet, "/api/task/"+task.TaskID+"/artifacts", nil))
+			require.Equal(t, http.StatusOK, list.Code)
+			var data struct {
+				Data struct {
+					Artifacts []taskArtifactResponse
+				}
+			}
+			require.NoError(t, common.Unmarshal(list.Body.Bytes(), &data))
+			require.Len(t, data.Data.Artifacts, 1, list.Body.String())
+			assert.NotContains(t, list.Body.String(), tc.host)
+			contentURL, err := url.Parse(data.Data.Artifacts[0].ContentURL)
+			require.NoError(t, err)
+			access := contentURL.Query().Get(service.TaskArtifactAccessQueryParameter)
+			assert.True(t, service.VerifyDashboardTaskArtifactAccess(access, task.TaskID, "video"))
+			assert.False(t, service.VerifyTaskArtifactAccess(access, task.TaskID, "video"))
+
+			content := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, contentURL.RequestURI(), nil)
+			req.Header.Set("Range", "bytes=0-127")
+			router.ServeHTTP(content, req)
+			require.Equal(t, http.StatusTemporaryRedirect, content.Code, content.Body.String())
+			assert.Equal(t, upstreamURL, content.Header().Get("Location"))
+			assert.Equal(t, "no-referrer", content.Header().Get("Referrer-Policy"))
+			assert.Equal(t, "private, no-store", content.Header().Get("Cache-Control"))
+			assert.Empty(t, content.Body.String())
+
+			foreign := httptest.NewRecorder()
+			router.ServeHTTP(foreign, httptest.NewRequest(http.MethodGet,
+				strings.Replace(contentURL.RequestURI(), task.TaskID, "different-task", 1), nil))
+			assert.Equal(t, http.StatusNotFound, foreign.Code)
+			assert.Empty(t, foreign.Header().Get("Location"))
+		})
+	}
+}
+
+func TestDashboardDirectVideoURLRejectsUnsupportedSources(t *testing.T) {
+	const host = "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com"
+	query := "?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-SignedHeaders=host" +
+		"&X-Tos-Credential=test&X-Tos-Date=20261124T040000Z&X-Tos-Expires=86400&X-Tos-Signature=" + strings.Repeat("b", 64)
+	for _, rawURL := range []string{
+		"https://other.example/video.mp4" + query,
+		host + ".other.example/video.mp4" + query,
+		"http" + strings.TrimPrefix(host, "https") + "/video.mp4" + query,
+		host + "/video.mp4",
+		host + "/image.png" + query,
+		host + "/video.mp4" + query + "#fragment",
+	} {
+		assert.Empty(t, dashboardDirectVideoURL("doubao", &relaychannel.TaskContentRequest{
+			URL: rawURL, Method: http.MethodGet, Credentialless: true,
+		}))
+	}
+	assert.Empty(t, dashboardDirectVideoURL("doubao", &relaychannel.TaskContentRequest{
+		URL: host + "/video.mp4" + query, Method: http.MethodGet, Credentialless: true,
+		Headers: map[string]string{"Authorization": "Bearer test"},
+	}))
+}
+
 func TestGetTaskDoesNotProjectArtifacts(t *testing.T) {
 	task := setupGenericTaskTest(t)
 	task.FailReason = "https://stale-upstream.invalid/video.mp4"
