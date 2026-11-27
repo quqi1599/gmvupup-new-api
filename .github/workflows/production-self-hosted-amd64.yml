@@ -46,8 +46,10 @@ jobs:
           test "$(uname -m)" = "x86_64"
           docker info >/dev/null
           disk_percent="$(df -P / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
-          if [ "$disk_percent" -ge 85 ]; then
-            echo "CI disk usage is ${disk_percent}%; refusing a heavy image build" >&2
+          inode_percent="$(df -Pi / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
+          printf 'disk_usage=%s%% inode_usage=%s%%\n' "$disk_percent" "$inode_percent"
+          if [ "$disk_percent" -ge 95 ] || [ "$inode_percent" -ge 95 ]; then
+            echo "Runner capacity gate blocked image publication." >&2
             exit 1
           fi
           echo "$REQUESTED_TAG" > VERSION
