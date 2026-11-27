@@ -18,10 +18,20 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Tag, Space, Skeleton } from '@douyinfe/semi-ui';
+import { Button, Space, Skeleton } from '@douyinfe/semi-ui';
+import { Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { renderQuota } from '../../../helpers';
 import CompactModeToggle from '../../common/ui/CompactModeToggle';
 import { useMinimumLoadingTime } from '../../../hooks/common/useMinimumLoadingTime';
+
+function StatPill({ label, value, mark }) {
+  return (
+    <span className='usage-stat-pill' style={{ '--pill-mark': mark }}>
+      {label} <strong>{value}</strong>
+    </span>
+  );
+}
 
 const LogsActions = ({
   stat,
@@ -29,8 +39,10 @@ const LogsActions = ({
   showStat,
   compactMode,
   setCompactMode,
+  isAdminUser,
   t,
 }) => {
+  const navigate = useNavigate();
   const showSkeleton = useMinimumLoadingTime(loadingStat);
   const needSkeleton = !showStat || showSkeleton;
 
@@ -45,49 +57,38 @@ const LogsActions = ({
   return (
     <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
       <Skeleton loading={needSkeleton} active placeholder={placeholder}>
-        <Space>
-          <Tag
-            color='blue'
-            style={{
-              fontWeight: 500,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-              padding: 13,
-            }}
-            className='!rounded-lg'
-          >
-            {t('消耗额度')}: {renderQuota(stat.quota)}
-          </Tag>
-          <Tag
-            color='pink'
-            style={{
-              fontWeight: 500,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-              padding: 13,
-            }}
-            className='!rounded-lg'
-          >
-            RPM: {stat.rpm}
-          </Tag>
-          <Tag
-            color='white'
-            style={{
-              border: 'none',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-              fontWeight: 500,
-              padding: 13,
-            }}
-            className='!rounded-lg'
-          >
-            TPM: {stat.tpm}
-          </Tag>
+        <Space wrap>
+          <StatPill
+            label={t('消耗额度')}
+            value={renderQuota(stat.quota)}
+            mark='var(--semi-color-primary)'
+          />
+          <StatPill
+            label='RPM'
+            value={stat.rpm}
+            mark='var(--semi-color-danger)'
+          />
+          <StatPill label='TPM' value={stat.tpm} />
         </Space>
       </Skeleton>
 
-      <CompactModeToggle
-        compactMode={compactMode}
-        setCompactMode={setCompactMode}
-        t={t}
-      />
+      <Space wrap>
+        {isAdminUser && (
+          <Button
+            size='small'
+            className='!rounded-full'
+            icon={<Activity size={16} />}
+            onClick={() => navigate('/console/model-performance')}
+          >
+            {t('模型监控')}
+          </Button>
+        )}
+        <CompactModeToggle
+          compactMode={compactMode}
+          setCompactMode={setCompactMode}
+          t={t}
+        />
+      </Space>
     </div>
   );
 };

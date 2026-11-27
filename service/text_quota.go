@@ -447,6 +447,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 
 	adminRejectReason := common.GetContextKeyString(ctx, constant.ContextKeyAdminRejectReason)
 	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	if originUsage != nil && summary.CompletionTokens > 0 {
+		relayInfo.PerformanceCompletionTokens = int64(summary.CompletionTokens)
+	}
 
 	var tieredResult *billingexpr.TieredResult
 	tieredBillingApplied := false

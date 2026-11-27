@@ -56,6 +56,7 @@ func Distribute() func(c *gin.Context) {
 				return
 			}
 		}
+		service.SetModelPerformanceModel(c, modelRequest.Model)
 		// Start the shared selection/retry budget only after receiving and parsing
 		// the upload. Slow clients must not consume it before routing can begin.
 		// An existing budget and the request context still retain their deadlines.
@@ -229,6 +230,7 @@ func Distribute() func(c *gin.Context) {
 						return
 					}
 					if channel == nil {
+						service.MarkModelPerformanceNoRoute(c)
 						abortWithOpenAiMessage(c, http.StatusServiceUnavailable, i18n.T(c, i18n.MsgDistributorNoAvailableChannel, map[string]any{"Group": usingGroup, "Model": modelRequest.Model}), types.ErrorCodeModelNotFound)
 						return
 					}

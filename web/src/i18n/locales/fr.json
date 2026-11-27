@@ -1,5 +1,9 @@
 {
   "translation": {
+    "性能健康": "État des performances",
+    "首字": "Premier jeton",
+    "耗时": "Durée",
+    "异步": "Asynchrone",
     "未完成": "Incomplet",
     "响应终态": "État final de la réponse",
     "用量来源": "Source de l’utilisation",

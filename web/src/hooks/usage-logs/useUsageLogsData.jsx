@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { Modal } from '@douyinfe/semi-ui';
 import { API } from '../../helpers/api';
 import {
@@ -41,6 +42,7 @@ import {
   renderTaskBillingProcess,
 } from '../../helpers/render';
 import { getLogOther } from '../../helpers/log';
+import { readPerformanceLogLink } from '../../helpers/model-performance';
 import { ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 import ParamOverrideEntry from '../../components/table/usage-logs/components/ParamOverrideEntry';
@@ -57,6 +59,7 @@ export const useLogsData = () => {
     GROUP: 'group',
     TYPE: 'type',
     MODEL: 'model',
+    STREAM: 'stream',
     USE_TIME: 'use_time',
     PROMPT: 'prompt',
     COMPLETION: 'completion',
@@ -79,6 +82,10 @@ export const useLogsData = () => {
 
   // User and admin
   const isAdminUser = isAdmin();
+  const location = useLocation();
+  const [performanceFilter] = useState(() =>
+    readPerformanceLogLink(location.search, isAdminUser),
+  );
   // Role-specific storage key to prevent different roles from overwriting each other
   const STORAGE_KEY = isAdminUser
     ? 'logs-table-columns-admin'
@@ -102,15 +109,20 @@ export const useLogsData = () => {
   const formInitValues = {
     username: '',
     token_name: '',
-    model_name: '',
-    channel: '',
+    model_name: performanceFilter?.model ?? '',
+    channel: performanceFilter?.channel ?? '',
     group: '',
     request_id: '',
     attempt_id: '',
-    dateRange: [
-      timestamp2string(getTodayStartTimestamp()),
-      timestamp2string(now.getTime() / 1000 + 3600),
-    ],
+    dateRange: performanceFilter
+      ? [
+          timestamp2string(performanceFilter.from),
+          timestamp2string(performanceFilter.to),
+        ]
+      : [
+          timestamp2string(getTodayStartTimestamp()),
+          timestamp2string(now.getTime() / 1000 + 3600),
+        ],
     logType: '0',
   };
 
@@ -124,6 +136,7 @@ export const useLogsData = () => {
       [COLUMN_KEYS.GROUP]: true,
       [COLUMN_KEYS.TYPE]: true,
       [COLUMN_KEYS.MODEL]: true,
+      [COLUMN_KEYS.STREAM]: true,
       [COLUMN_KEYS.USE_TIME]: true,
       [COLUMN_KEYS.PROMPT]: true,
       [COLUMN_KEYS.COMPLETION]: true,
@@ -145,6 +158,9 @@ export const useLogsData = () => {
     try {
       const parsed = JSON.parse(savedColumns);
       const merged = { ...defaults, ...parsed };
+      if (typeof parsed?.[COLUMN_KEYS.STREAM] !== 'boolean') {
+        merged[COLUMN_KEYS.STREAM] = merged[COLUMN_KEYS.USE_TIME];
+      }
 
       if (!isAdminUser) {
         merged[COLUMN_KEYS.CHANNEL] = false;
@@ -242,7 +258,7 @@ export const useLogsData = () => {
 
   // 获取表单值的辅助函数，确保所有值都是字符串
   const getFormValues = () => {
-    const formValues = formApi ? formApi.getValues() : {};
+    const formValues = formApi ? formApi.getValues() : formInitValues;
 
     let start_timestamp = timestamp2string(getTodayStartTimestamp());
     let end_timestamp = timestamp2string(now.getTime() / 1000 + 3600);
@@ -562,7 +578,10 @@ export const useLogsData = () => {
           Boolean(other?.violation_fee_marker);
 
         let content = '';
-        if (!isViolationFeeLog && (other?.managed_web || other?.billing_mode !== 'tiered_expr')) {
+        if (
+          !isViolationFeeLog &&
+          (other?.managed_web || other?.billing_mode !== 'tiered_expr')
+        ) {
           const logOpts = {
             ...other,
             prompt_tokens: logs[i].prompt_tokens,
@@ -590,7 +609,11 @@ export const useLogsData = () => {
             value: other.reasoning_effort,
           });
         }
-        if (!other?.managed_web && other?.billing_mode === 'tiered_expr' && other?.expr_b64) {
+        if (
+          !other?.managed_web &&
+          other?.billing_mode === 'tiered_expr' &&
+          other?.expr_b64
+        ) {
           expandDataLocal.push({
             key: t('计费过程'),
             value: renderTieredModelPrice({

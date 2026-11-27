@@ -47,6 +47,7 @@ const Token = lazy(() => import('./pages/Token'));
 const Redemption = lazy(() => import('./pages/Redemption'));
 const TopUp = lazy(() => import('./pages/TopUp'));
 const Log = lazy(() => import('./pages/Log'));
+const ModelPerformance = lazy(() => import('./pages/ModelPerformance'));
 const Chat = lazy(() => import('./pages/Chat'));
 const Chat2Link = lazy(() => import('./pages/Chat2Link'));
 const Midjourney = lazy(() => import('./pages/Midjourney'));
@@ -184,6 +185,10 @@ function App() {
         <Route
           path='/console/log'
           element={<PrivateRoute>{lazyPage(<Log />)}</PrivateRoute>}
+        />
+        <Route
+          path='/console/model-performance'
+          element={<AdminRoute>{lazyPage(<ModelPerformance />)}</AdminRoute>}
         />
         <Route
           path='/console'

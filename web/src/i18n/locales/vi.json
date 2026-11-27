@@ -1,5 +1,9 @@
 {
   "translation": {
+    "性能健康": "Tình trạng hiệu năng",
+    "首字": "Token đầu tiên",
+    "耗时": "Thời lượng",
+    "异步": "Bất đồng bộ",
     "未完成": "Chưa hoàn tất",
     "响应终态": "Trạng thái cuối phản hồi",
     "用量来源": "Nguồn số liệu sử dụng",

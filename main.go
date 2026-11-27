@@ -194,6 +194,7 @@ func main() {
 		Addr:    ":" + port,
 		Handler: server,
 	}
+	stopModelPerformance := service.StartModelPerformance()
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -212,6 +213,7 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		common.SysError(fmt.Sprintf("server forced to shutdown: %v", err))
 	}
+	stopModelPerformance()
 	if err := common.CheckpointRequestBodyMetrics(); err != nil {
 		common.SysError(fmt.Sprintf("failed to checkpoint request body metrics during shutdown: %v", err))
 	}

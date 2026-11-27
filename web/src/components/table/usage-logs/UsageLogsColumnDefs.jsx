@@ -37,6 +37,11 @@ import {
 } from '../../../helpers';
 import { IconHelpCircle } from '@douyinfe/semi-icons';
 import { CircleAlert, Route, Sparkles } from 'lucide-react';
+import {
+  getUsageLogSpeed,
+  getUsageLogTiming,
+} from '../../../helpers/model-performance';
+import './official-log-style.css';
 
 const colors = [
   'amber',
@@ -163,95 +168,75 @@ function buildStreamStatusTooltip(ss, t) {
   );
 }
 
-function renderIsStream(bool, t, streamStatus) {
-  const isError = streamStatus && streamStatus.status !== 'ok';
-
-  if (bool) {
-    return (
-      <span style={{ position: 'relative', display: 'inline-block' }}>
-        <Tag color='blue' shape='circle'>
-          {t('流')}
-        </Tag>
-        {isError && (
-          <Tooltip content={buildStreamStatusTooltip(streamStatus, t)}>
+function renderStreamMetrics(record, t) {
+  const other = getLogOther(record.other);
+  const speed = getUsageLogSpeed(record, other);
+  const status = other?.stream_status;
+  const asyncTask = other?.is_task === true && other?.task_sync !== true;
+  const stream = record.is_stream && !asyncTask;
+  const label = stream ? t('流') : asyncTask ? t('异步') : t('非流');
+  const anomaly = stream && status?.status && status.status !== 'ok';
+  return (
+    <div className='usage-stream-cell'>
+      <span className={'usage-stream-label' + (stream ? ' is-stream' : '')}>
+        {label}
+        {anomaly && (
+          <Tooltip content={buildStreamStatusTooltip(status, t)}>
             <span
-              style={{
-                position: 'absolute',
-                right: -4,
-                top: -4,
-                lineHeight: 1,
-                color:
-                  streamStatus?.status === 'incomplete' ? '#d97706' : '#ef4444',
-                cursor: 'pointer',
-                userSelect: 'none',
-              }}
+              tabIndex={0}
+              role='img'
+              aria-label={t('流状态')}
+              className={
+                'usage-tone-' +
+                (status.status === 'incomplete' ? 'watch' : 'low')
+              }
             >
-              <CircleAlert size={14} strokeWidth={2.5} color='currentColor' />
+              <CircleAlert size={13} />
             </span>
           </Tooltip>
         )}
       </span>
-    );
-  } else {
-    return (
-      <Tag color='purple' shape='circle'>
-        {t('非流')}
-      </Tag>
-    );
-  }
+      {speed ? (
+        <Tooltip
+          content={
+            speed.approximate
+              ? t('估算输出速度：输出 token ÷ 整次用时（旧日志为秒级）')
+              : t('整程输出速度：输出 token ÷ 整次用时')
+          }
+        >
+          <span className='usage-stream-rate'>
+            {speed.approximate ? '≈ ' : ''}
+            {speed.value.toFixed(1)} t/s
+          </span>
+        </Tooltip>
+      ) : (
+        <span className='usage-stream-rate'>—</span>
+      )}
+    </div>
+  );
 }
 
-function renderUseTime(type, t) {
-  const time = parseInt(type);
-  if (time < 101) {
+function renderDurationMetrics(record, t) {
+  const { first, total, firstTone, totalTone } = getUsageLogTiming(
+    record,
+    getLogOther(record.other),
+  );
+  const format = (value) =>
+    value == null ? '—' : value.toFixed(value < 1 ? 2 : 1) + ' s';
+  function timing(label, value, tone) {
     return (
-      <Tag color='green' shape='circle'>
-        {' '}
-        {time} s{' '}
-      </Tag>
-    );
-  } else if (time < 300) {
-    return (
-      <Tag color='orange' shape='circle'>
-        {' '}
-        {time} s{' '}
-      </Tag>
-    );
-  } else {
-    return (
-      <Tag color='red' shape='circle'>
-        {' '}
-        {time} s{' '}
-      </Tag>
+      <div className={'usage-timing-line usage-tone-' + tone}>
+        <span>{label}</span>
+        <strong>{format(value)}</strong>
+      </div>
     );
   }
-}
-
-function renderFirstUseTime(type, t) {
-  let time = parseFloat(type) / 1000.0;
-  time = time.toFixed(1);
-  if (time < 3) {
-    return (
-      <Tag color='green' shape='circle'>
-        {' '}
-        {time} s{' '}
-      </Tag>
-    );
-  } else if (time < 10) {
-    return (
-      <Tag color='orange' shape='circle'>
-        {' '}
-        {time} s{' '}
-      </Tag>
-    );
-  } else {
-    return (
-      <Tag color='red' shape='circle'>
-        {' '}
-        {time} s{' '}
-      </Tag>
-    );
-  }
+  return (
+    <div className='usage-timing-cell'>
+      {record.is_stream && timing(t('首字'), first, firstTone)}
+      {timing(t('耗时'), total, totalTone)}
+    </div>
+  );
 }
 
 function renderBillingTag(record, t) {
@@ -692,35 +677,24 @@ export const getLogsColumns = ({
       },
     },
     {
+      key: COLUMN_KEYS.STREAM,
+      title: t('流'),
+      dataIndex: 'is_stream',
+      width: 96,
+      render: (_, record) =>
+        record.type === 2 || record.type === 5
+          ? renderStreamMetrics(record, t)
+          : null,
+    },
+    {
       key: COLUMN_KEYS.USE_TIME,
-      title: t('用时/首字'),
+      title: t('耗时'),
       dataIndex: 'use_time',
-      render: (text, record, index) => {
-        if (!(record.type === 2 || record.type === 5)) {
-          return <></>;
-        }
-        if (record.is_stream) {
-          let other = getLogOther(record.other);
-          return (
-            <>
-              <Space>
-                {renderUseTime(text, t)}
-                {renderFirstUseTime(other?.frt, t)}
-                {renderIsStream(record.is_stream, t, other?.stream_status)}
-              </Space>
-            </>
-          );
-        } else {
-          return (
-            <>
-              <Space>
-                {renderUseTime(text, t)}
-                {renderIsStream(record.is_stream, t)}
-              </Space>
-            </>
-          );
-        }
-      },
+      width: 112,
+      render: (_, record) =>
+        record.type === 2 || record.type === 5
+          ? renderDurationMetrics(record, t)
+          : null,
     },
     {
       key: COLUMN_KEYS.PROMPT,

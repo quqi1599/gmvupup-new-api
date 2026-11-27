@@ -140,6 +140,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError *types.NewAPIError
 		ws          *websocket.Conn
 	)
+	performance := service.GetModelPerformanceTrace(c)
+	var performanceInfo *relaycommon.RelayInfo
 
 	if relayFormat == types.RelayFormatOpenAIRealtime {
 		var err error
@@ -152,6 +154,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	defer func() {
+		if performance != nil {
+			performance.SetRelayFinal(c, performanceInfo, newAPIError)
+		}
 		if newAPIError != nil {
 			c.Set("relay_final_outcome", "failed")
 			if common.GetContextKeyString(c, constant.ContextKeyRelayCancelOrigin) == constant.RelayCancelOriginDownstreamDisconnected {
@@ -182,6 +187,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
 	}
+	performanceInfo = relayInfo
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
@@ -375,6 +381,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		common.SetContextKey(c, constant.ContextKeyRelayBodyComplete, true)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
+		var performanceAttemptStart time.Time
+		if performance != nil {
+			relayInfo.PerformanceCompletionTokens = 0
+			performanceAttemptStart = time.Now()
+		}
 		newAPIError = relay.ManagedWebHelper(c, relayInfo, func() *types.NewAPIError {
 			switch relayFormat {
 			case types.RelayFormatOpenAIRealtime:
@@ -387,6 +398,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 				return relayHandler(c, relayInfo)
 			}
 		})
+		if performance != nil {
+			performance.ObserveAttempt(c, relayInfo, channel.Id, newAPIError, performanceAttemptStart, time.Now())
+		}
 
 		if newAPIError == nil {
 			if relayInfo.ShouldRecordChannelSuccess() {

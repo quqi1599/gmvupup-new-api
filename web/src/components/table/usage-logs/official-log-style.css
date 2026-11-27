@@ -1,0 +1,88 @@
+.usage-stream-cell,
+.usage-timing-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-stream-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--semi-color-text-1);
+  font-weight: 600;
+}
+
+.usage-stream-label.is-stream {
+  color: var(--semi-color-primary);
+}
+.usage-stream-rate {
+  color: var(--semi-color-text-2);
+}
+
+.usage-timing-cell {
+  gap: 0;
+}
+.usage-timing-line {
+  --usage-tone: var(--semi-color-text-2);
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  border-inline-start: 3px solid var(--usage-tone);
+  padding-inline-start: 7px;
+}
+
+.usage-timing-line:first-child {
+  border-start-start-radius: 3px;
+}
+.usage-timing-line:last-child {
+  border-end-start-radius: 3px;
+}
+.usage-timing-line > span {
+  color: var(--semi-color-text-2);
+}
+.usage-timing-line > strong {
+  color: var(--usage-tone);
+  font-weight: 600;
+}
+.usage-tone-healthy {
+  --usage-tone: var(--semi-color-success);
+  color: var(--usage-tone);
+}
+.usage-tone-watch {
+  --usage-tone: var(--semi-color-warning);
+  color: var(--usage-tone);
+}
+.usage-tone-low {
+  --usage-tone: var(--semi-color-danger);
+  color: var(--usage-tone);
+}
+
+.usage-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 999px;
+  color: var(--semi-color-text-2);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.usage-stat-pill::before {
+  content: '';
+  width: 2px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--pill-mark, var(--semi-color-text-2));
+}
+.usage-stat-pill strong {
+  color: var(--semi-color-text-0);
+  font-variant-numeric: tabular-nums;
+}

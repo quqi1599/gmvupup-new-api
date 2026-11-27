@@ -216,6 +216,8 @@ type RelayInfo struct {
 	// partial usage still follows the existing settlement policy. It is never a
 	// successful completion or permission to replay the upstream operation.
 	PartialStreamError *types.NewAPIError
+	// Used only by monitoring; it does not affect quota or retry decisions.
+	PerformanceCompletionTokens int64
 
 	ThinkingContentInfo
 	TokenCountMeta
