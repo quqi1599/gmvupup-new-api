@@ -19,7 +19,8 @@ const (
 	SaaSGiftPolicyVersion = "double11-2026-v1"
 	SaaSGiftModel         = "claude-sonnet-4-6"
 	SaaSGiftFlashModel    = "glm-5.3-flash"
-	SaaSGiftModelLimits   = SaaSGiftModel + "," + SaaSGiftFlashModel
+	SaaSGiftGLM54Model    = "glm-5.4"
+	SaaSGiftModelLimits   = SaaSGiftModel + "," + SaaSGiftFlashModel + "," + SaaSGiftGLM54Model
 	SaaSGiftActive        = "ACTIVE"
 	SaaSGiftFrozen        = "FROZEN_PENDING_REVIEW"
 )
@@ -542,18 +543,21 @@ func ValidateSaaSGiftToken(ctx context.Context, token *Token) error {
 	return validateGiftBinding(DB.WithContext(ctx), &account)
 }
 
-// The legacy single-model limit remains valid while existing gift keys migrate.
+// The previous limits remain valid while existing gift keys migrate.
 // Unknown models, empty entries and duplicates must never widen a gift key.
 func validGiftModelLimits(value string) bool {
 	if value == SaaSGiftModel {
 		return true
 	}
 	names := strings.Split(value, ",")
-	return len(names) == 2 && names[0] != names[1] && IsSaaSGiftModel(names[0]) && IsSaaSGiftModel(names[1])
+	if !containsGiftModel(names, SaaSGiftModel) || !containsGiftModel(names, SaaSGiftFlashModel) {
+		return false
+	}
+	return len(names) == 2 || (len(names) == 3 && containsGiftModel(names, SaaSGiftGLM54Model))
 }
 
 func IsSaaSGiftModel(name string) bool {
-	return name == SaaSGiftModel || name == SaaSGiftFlashModel
+	return name == SaaSGiftModel || name == SaaSGiftFlashModel || name == SaaSGiftGLM54Model
 }
 
 func containsGiftModel(names []string, name string) bool {

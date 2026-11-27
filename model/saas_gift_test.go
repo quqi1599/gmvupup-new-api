@@ -326,18 +326,19 @@ func TestSaaSGiftCachedUsageCreditAndFreeze(t *testing.T) {
 }
 
 func TestGiftModelExpansionPreservesRestrictions(t *testing.T) {
-	for _, name := range []string{SaaSGiftModel, SaaSGiftFlashModel} {
+	for _, name := range []string{SaaSGiftModel, SaaSGiftFlashModel, SaaSGiftGLM54Model} {
 		assert.True(t, IsSaaSGiftModel(name))
 	}
-	for _, value := range []string{SaaSGiftModel, SaaSGiftModelLimits, SaaSGiftFlashModel + "," + SaaSGiftModel} {
+	for _, value := range []string{SaaSGiftModel, SaaSGiftModel + "," + SaaSGiftFlashModel, SaaSGiftModelLimits, SaaSGiftFlashModel + "," + SaaSGiftModel} {
 		assert.True(t, validGiftModelLimits(value))
 	}
-	for _, value := range []string{"", SaaSGiftFlashModel, "gpt-4o", SaaSGiftModel + ",gpt-4o", SaaSGiftModel + "," + SaaSGiftModel, SaaSGiftModelLimits + ","} {
+	for _, value := range []string{"", SaaSGiftFlashModel, "gpt-4o", SaaSGiftModel + ",gpt-4o", SaaSGiftModel + "," + SaaSGiftModel, SaaSGiftModelLimits + ",", SaaSGiftModel + "," + SaaSGiftGLM54Model, SaaSGiftModel + "," + SaaSGiftFlashModel + "," + SaaSGiftModel} {
 		assert.False(t, validGiftModelLimits(value))
 	}
 	setupSaaSGiftTest(t)
 	require.NoError(t, DB.Create(&Ability{Group: "双十一", Model: SaaSGiftFlashModel, ChannelId: 2, Enabled: true}).Error)
-	a := createGift(t, "two-model-wallet")
+	require.NoError(t, DB.Create(&Ability{Group: "双十一", Model: SaaSGiftGLM54Model, ChannelId: 4, Enabled: true}).Error)
+	a := createGift(t, "three-model-wallet")
 	tok, err := GetTokenById(*a.TokenID)
 	require.NoError(t, err)
 	assert.Equal(t, SaaSGiftModelLimits, tok.ModelLimits)
