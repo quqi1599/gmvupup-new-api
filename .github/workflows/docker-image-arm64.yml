@@ -64,6 +64,17 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Validate host capacity
+        run: |
+          set -euo pipefail
+          disk_percent="$(df -P / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
+          inode_percent="$(df -Pi / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
+          printf 'disk_usage=%s%% inode_usage=%s%%\n' "$disk_percent" "$inode_percent"
+          if [ "$disk_percent" -ge 95 ] || [ "$inode_percent" -ge 95 ]; then
+            echo "Runner capacity gate blocked image publication." >&2
+            exit 1
+          fi
+
       - name: Resolve tag & write VERSION
         env:
           REQUESTED_TAG: ${{ inputs.tag }}
