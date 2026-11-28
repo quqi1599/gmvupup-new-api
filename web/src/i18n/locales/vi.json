@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Responses WebSocket v2": "Responses WebSocket v2",
+    "仅在该渠道支持原生 Responses WebSocket 续接时开启": "Chỉ bật khi kênh hỗ trợ tiếp tục hội thoại qua Responses WebSocket gốc",
     "性能健康": "Tình trạng hiệu năng",
     "首字": "Token đầu tiên",
     "耗时": "Thời lượng",

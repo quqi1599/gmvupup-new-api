@@ -919,6 +919,10 @@ func (channel *Channel) SupportsEndpointType(endpointType constant.EndpointType)
 	}
 	// The Anthropic adapter only exposes Messages and cannot convert an
 	// embedding request. Other adapters retain their existing capabilities.
+	if endpointType == constant.EndpointTypeResponsesWebSocket {
+		var settings dto.ChannelSettings
+		return (channel.Type == constant.ChannelTypeOpenAI || channel.Type == constant.ChannelTypeCodex || channel.Type == constant.ChannelTypeAzure) && channel.Setting != nil && common.UnmarshalJsonStr(*channel.Setting, &settings) == nil && settings.ResponsesWebSocketEnabled
+	}
 	if endpointType == constant.EndpointTypeEmbeddings {
 		return channel.Type != constant.ChannelTypeAnthropic
 	}

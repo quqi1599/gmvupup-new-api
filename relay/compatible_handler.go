@@ -72,6 +72,9 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	adaptor.Init(info)
 
 	passThroughGlobal := model_setting.GetGlobalSettings().PassThroughRequestEnabled
+	if !passThroughGlobal && !info.ChannelSetting.PassThroughBodyEnabled && (info.ApiType == constant.APITypeOpenAI || info.ApiType == constant.APITypeCodex) {
+		request.NormalizeCodexContext()
+	}
 	chatViaResponses := info.RelayMode == relayconstant.RelayModeChatCompletions &&
 		!passThroughGlobal &&
 		!info.ChannelSetting.PassThroughBodyEnabled &&

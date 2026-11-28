@@ -427,6 +427,21 @@ func (p *Plan) Execute(ctx context.Context, s *Session, c Call) (Executed, error
 	return e, nil
 }
 
+func responseToolResults(input []json.RawMessage, executed []Executed) json.RawMessage {
+	for _, e := range executed {
+		input = append(input, Raw(map[string]any{"type": "function_call_output", "call_id": e.Call.ID, "output": string(e.Data)}))
+	}
+	return Raw(input)
+}
+
+// ContinueResponsesOnSocket sends only results of the managed calls. The
+// verified native parent owns the previous input and model-generated calls.
+func (p *Plan) ContinueResponsesOnSocket(parent string, executed []Executed) {
+	delete(p.Body, "tool_choice")
+	p.Body["previous_response_id"] = Raw(parent)
+	p.Body["input"] = responseToolResults(nil, executed)
+}
+
 func (p *Plan) Continue(response Object, executed []Executed) error {
 	delete(p.Body, "tool_choice") // A forced initial search must not force every round.
 	switch p.Protocol {
@@ -436,10 +451,7 @@ func (p *Plan) Continue(response Object, executed []Executed) error {
 			input = []json.RawMessage{Raw(map[string]any{"role": "user", "content": text})}
 		}
 		input = append(input, Arr(response["output"])...)
-		for _, e := range executed {
-			input = append(input, Raw(map[string]any{"type": "function_call_output", "call_id": e.Call.ID, "output": string(e.Data)}))
-		}
-		p.Body["input"] = Raw(input)
+		p.Body["input"] = responseToolResults(input, executed)
 	case "claude":
 		messages := Arr(p.Body["messages"])
 		messages = append(messages, Raw(map[string]any{"role": "assistant", "content": json.RawMessage(response["content"])}))

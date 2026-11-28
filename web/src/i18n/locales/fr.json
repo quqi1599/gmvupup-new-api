@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Responses WebSocket v2": "Responses WebSocket v2",
+    "仅在该渠道支持原生 Responses WebSocket 续接时开启": "Activer uniquement si ce canal permet de poursuivre une conversation via le WebSocket Responses natif",
     "性能健康": "État des performances",
     "首字": "Premier jeton",
     "耗时": "Durée",

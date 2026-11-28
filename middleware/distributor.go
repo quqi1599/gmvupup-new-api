@@ -155,13 +155,21 @@ func Distribute() func(c *gin.Context) {
 					TokenGroup:            usingGroup,
 					Retry:                 common.GetPointer(0),
 					PreferredChannelTypes: types.PathToPreferredChannelTypes(c.Request.URL.Path),
-					RequiredEndpointType:  types.PathToRequiredEndpointType(c.Request.URL.Path),
+					RequiredEndpointType:  service.RequiredRelayEndpoint(c),
 				}
 
 				// A channel-level model-first switch is intentionally evaluated before
 				// affinity. The selector still enforces protected-key exclusions,
 				// group/model membership, endpoint capability and circuit state.
-				channel, selectGroup, err = service.CacheGetModelRoutingFirstSatisfiedChannel(selectionParam)
+				if b := service.ResponsesSocketBinding(c); b != nil && b.ChannelID != 0 {
+					channel, selectGroup, err = service.BoundResponsesChannel(c, b, modelRequest.Model)
+					if err != nil {
+						abortWithOpenAiMessage(c, http.StatusConflict, err.Error())
+						return
+					}
+				} else {
+					channel, selectGroup, err = service.CacheGetModelRoutingFirstSatisfiedChannel(selectionParam)
+				}
 				if err != nil {
 					message := i18n.T(c, i18n.MsgDistributorGetChannelFailed, map[string]any{"Group": usingGroup, "Model": modelRequest.Model, "Error": err.Error()})
 					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, message, types.ErrorCodeModelNotFound)
@@ -172,7 +180,7 @@ func Distribute() func(c *gin.Context) {
 					if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found {
 						preferred, err := model.CacheGetChannel(preferredChannelID)
 						if err == nil && preferred != nil {
-							requiredEndpoint := types.PathToRequiredEndpointType(c.Request.URL.Path)
+							requiredEndpoint := service.RequiredRelayEndpoint(c)
 							if !preferred.SupportsEndpointType(requiredEndpoint) {
 								service.ClearChannelAffinityForRequest(c)
 								preferred = nil
@@ -230,6 +238,13 @@ func Distribute() func(c *gin.Context) {
 						return
 					}
 					if channel == nil {
+						if service.ResponsesSocketBinding(c) != nil {
+							capable, lookupErr := model.HasResponsesSocketChannel(service.ResponsesSocketGroups(c), 0, []string{modelRequest.Model})
+							if lookupErr == nil && !capable {
+								abortWithOpenAiMessage(c, http.StatusUpgradeRequired, "Use HTTP Responses for this model", types.ErrorCode("websocket_not_supported"))
+								return
+							}
+						}
 						service.MarkModelPerformanceNoRoute(c)
 						abortWithOpenAiMessage(c, http.StatusServiceUnavailable, i18n.T(c, i18n.MsgDistributorNoAvailableChannel, map[string]any{"Group": usingGroup, "Model": modelRequest.Model}), types.ErrorCodeModelNotFound)
 						return
@@ -488,6 +503,15 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if channel == nil {
 		return types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
+	binding := service.ResponsesSocketBinding(c)
+	if binding != nil {
+		if !channel.SupportsEndpointType(constant.EndpointTypeResponsesWebSocket) {
+			return types.NewErrorWithStatusCode(errors.New("channel does not support Responses WebSocket"), types.ErrorCodeGetChannelFailed, 426, types.ErrOptionWithSkipRetry())
+		}
+		if binding.ChannelID != 0 && (channel.Id != binding.ChannelID || binding.Model != modelName || binding.UserID != c.GetInt("id") || binding.TokenID != c.GetInt("token_id")) {
+			return types.NewErrorWithStatusCode(errors.New("Responses WebSocket route changed"), types.ErrorCodeGetChannelFailed, 409, types.ErrOptionWithSkipRetry())
+		}
+	}
 	// Explicit channel selection also needs the pre-send capability check;
 	// automatic selection already filters incompatible embedding routes.
 	if c.Request != nil && types.PathToRequiredEndpointType(c.Request.URL.Path) == constant.EndpointTypeEmbeddings && !channel.SupportsEndpointType(constant.EndpointTypeEmbeddings) {
@@ -516,7 +540,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, channel.GetModelMapping())
 	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, channel.GetStatusCodeMapping())
 
-	key, index, newAPIError := channel.GetNextEnabledKey()
+	key, index, newAPIError := binding.ChannelKey(channel)
 	if newAPIError != nil {
 		return newAPIError
 	}

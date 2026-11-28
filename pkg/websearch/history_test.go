@@ -15,6 +15,19 @@ func (s *historyReadCounter) Get(context.Context, string) (Record, error) {
 	return Record{}, nil
 }
 
+func TestContinueResponsesOnSocketSendsOnlyNewResults(t *testing.T) {
+	p := &Plan{Protocol: "responses", Body: Object{"input": Raw("prior history"), "tool_choice": Raw("required")}}
+	p.ContinueResponsesOnSocket("resp_approved", []Executed{{Call: Call{ID: "call_search"}, Data: Raw("result")}})
+	items := Arr(p.Body["input"])
+	if len(items) != 1 || Text(p.Body["previous_response_id"]) != "resp_approved" || p.Body["tool_choice"] != nil {
+		t.Fatalf("incorrect native continuation: %s", Raw(p.Body))
+	}
+	item, err := Obj(items[0])
+	if err != nil || Text(item["type"]) != "function_call_output" || Text(item["call_id"]) != "call_search" || Text(item["output"]) != string(Raw("result")) {
+		t.Fatalf("lost tool result: %s", items[0])
+	}
+}
+
 func TestManagedHistoryOnlyRecognizesProtocolReferences(t *testing.T) {
 	for _, tc := range []struct {
 		protocol, body string

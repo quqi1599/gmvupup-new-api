@@ -431,7 +431,13 @@ func runManagedWeb(c *gin.Context, info *relaycommon.RelayInfo, run func() *type
 			collected = append(collected, parts...)
 		}
 		if len(executed) > 0 && !external {
-			if err := plan.Continue(response, executed); err != nil {
+			if turn := channel.SocketTurn(c.Request.Context()); turn != nil && plan.Protocol == "responses" {
+				parent := websearch.Text(response["id"])
+				if err := turn.ContinueManagedRound(parent); err != nil {
+					return webError(err, 502)
+				}
+				plan.ContinueResponsesOnSocket(parent, executed)
+			} else if err := plan.Continue(response, executed); err != nil {
 				return webError(err, 502)
 			}
 			continue

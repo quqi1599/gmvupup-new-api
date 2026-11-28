@@ -153,6 +153,12 @@ func AppendRelayObservabilityAdminInfo(ctx *gin.Context, relayInfo *relaycommon.
 	if intake, ok := common.GetContextKeyType[int64](ctx, constant.ContextKeyRelayRequestIntakeMS); ok {
 		adminInfo["request_intake_ms"] = intake
 	}
+	if n := common.GetContextKeyInt(ctx, constant.ContextKeyCodexContextNormalized); n > 0 {
+		adminInfo["codex_context_normalized"] = n
+	}
+	if ResponsesSocketBinding(ctx) != nil {
+		adminInfo["client_transport"] = "responses_websocket_v2"
+	}
 	if controls, ok := common.GetContextKeyType[*types.RequestControls](ctx, constant.ContextKeyRequestControlsDiagnostic); ok && controls != nil && controls.Valid() {
 		adminInfo["request_controls"] = *controls
 	}

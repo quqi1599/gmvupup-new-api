@@ -282,7 +282,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	// Legacy embedding URLs use the Gemini dispatcher; preserve their path
 	// capability when the relay format itself has no strict endpoint gate.
 	if retryParam.RequiredEndpointType == "" && c.Request != nil {
-		retryParam.RequiredEndpointType = types.PathToRequiredEndpointType(c.Request.URL.Path)
+		retryParam.RequiredEndpointType = service.RequiredRelayEndpoint(c)
 	}
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
@@ -928,6 +928,9 @@ func relayProgressStarted(c *gin.Context, info *relaycommon.RelayInfo) bool {
 }
 
 func relayRetryIsUnsafe(c *gin.Context, info *relaycommon.RelayInfo, relayFormat types.RelayFormat, relayErr *types.NewAPIError) bool {
+	if b := service.ResponsesSocketBinding(c); b != nil && b.ChannelID != 0 {
+		return true
+	}
 	if service.GatewayReplayStopReason(c) != "" {
 		return true
 	}

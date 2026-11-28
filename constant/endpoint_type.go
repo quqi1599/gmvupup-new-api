@@ -3,6 +3,7 @@ package constant
 type EndpointType string
 
 const (
+	EndpointTypeResponsesWebSocket    EndpointType = "responses-websocket"
 	EndpointTypeDecisions             EndpointType = "decisions"
 	EndpointTypeOpenAI                EndpointType = "openai"
 	EndpointTypeOpenAIResponse        EndpointType = "openai-response"
